@@ -56,6 +56,9 @@ dependencies {
     implementation depLibs.zookeeper
     runtimeOnly depLibs.metricsCore
     runtimeOnly depLibs.snappy
+    runtimeOnly depLibs.log4jSlf4jImpl
+    runtimeOnly depLibs.log4j12api
+    runtimeOnly depLibs.log4jCore
 
     testImplementation project(':bookkeeper-stats-providers:prometheus-metrics-provider')
     testImplementation project(':bookkeeper-http:vertx-http-server')
