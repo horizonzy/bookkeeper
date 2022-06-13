@@ -59,7 +59,7 @@ class PendingReadOp implements ReadEntryCallback, SafeRunnable {
     private static final Logger LOG = LoggerFactory.getLogger(PendingReadOp.class);
 
     private ScheduledFuture<?> speculativeTask = null;
-    protected final List<LedgerEntryRequest> seq;
+    protected final LinkedList<LedgerEntryRequest> seq;
     private final CompletableFuture<LedgerEntries> future;
     private final Set<BookieId> heardFromHosts;
     private final BitSet heardFromHostsBitSet;
