@@ -241,6 +241,7 @@ class BookieWatcherImpl implements BookieWatcher {
                 readonly = initialReadonlyBookiesFuture;
             }
         }
+
         try {
             FutureUtils.result(writable, EXCEPTION_FUNC);
         } catch (BKInterruptedException ie) {

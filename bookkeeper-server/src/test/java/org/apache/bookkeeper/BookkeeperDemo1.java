@@ -18,31 +18,27 @@
 package org.apache.bookkeeper;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Enumeration;
-import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
-import org.apache.bookkeeper.client.LedgerEntry;
 import org.apache.bookkeeper.client.LedgerHandle;
+import org.apache.bookkeeper.client.api.BKException;
+import org.apache.bookkeeper.client.api.LedgerEntries;
+import org.apache.bookkeeper.client.api.LedgerEntry;
 
-public class BookkeeperDemo {
+public class BookkeeperDemo1 {
 
     public static void main(String[] args) throws BKException, IOException, InterruptedException {
         BookKeeper bkc = new BookKeeper("127.0.0.1:2181");
 
-        LedgerHandle lh = bkc.createLedger(3, 3, 2, BookKeeper.DigestType.MAC, "".getBytes(StandardCharsets.UTF_8));
-        ByteBuffer entry = ByteBuffer.allocate(4);
+        LedgerHandle lh = bkc.openLedger(86, DigestType.MAC, "".getBytes(StandardCharsets.UTF_8));
+        LedgerEntries entries = lh.read(1, 1);
 
-        int numberOfEntries = 100;
-        for (int i = 0; i < numberOfEntries; i++) {
-            entry.putInt(i);
-            entry.position(0);
-            lh.addEntry(entry.array());
+        for (LedgerEntry entry : entries) {
+            byte[] entryBytes = entry.getEntryBytes();
+            System.out.println(new String(entryBytes));
         }
 
-        System.in.read();
         lh.close();
         bkc.close();
 

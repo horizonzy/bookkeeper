@@ -91,7 +91,7 @@ class LedgerRecoveryOp implements ReadEntryListener, AddCallback {
         this.entryListener = entryListener;
         return this;
     }
-
+    
     public CompletableFuture<LedgerHandle> initiate() {
         ReadLastConfirmedOp rlcop = new ReadLastConfirmedOp(clientCtx.getBookieClient(),
                                                             lh.distributionSchedule,
