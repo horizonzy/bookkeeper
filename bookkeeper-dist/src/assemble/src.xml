@@ -30,6 +30,7 @@
         <include>**/README.md</include>
         <include>**/LICENSE</include>
         <include>**/NOTICE</include>
+        <include>**/pom.xml</include>
         <include>**/*gradle*</include>
         <include>**/src/**</include>
         <include>**/conf/**</include>
@@ -58,7 +59,6 @@
         <!-- dev -->
         <exclude>dev/**</exclude>
         <!-- site -->
-        <exclude>site/**</exclude>
         <exclude>site3/**</exclude>
       </excludes>
     </fileSet>

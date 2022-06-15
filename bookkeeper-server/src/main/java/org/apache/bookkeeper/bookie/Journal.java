@@ -588,7 +588,7 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
         }
     }
 
-    private class CbThreadFactory implements ThreadFactory {
+    private static class CbThreadFactory implements ThreadFactory {
         private int counter = 0;
         private String threadBaseName = "bookie-journal-callback";
 
@@ -1222,7 +1222,7 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
             LOG.info("Journal exits when shutting down");
         } finally {
             // There could be packets queued for forceWrite on this logFile
-            // That is fine as this exception is going to anyway take down the
+            // That is fine as this exception is going to anyway take down
             // the bookie. If we execute this as a part of graceful shutdown,
             // close will flush the file system cache making any previous
             // cached writes durable so this is fine as well.
@@ -1277,7 +1277,6 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
         return total;
     }
 
-    //
     /**
      * Wait for the Journal thread to exit.
      * This is method is needed in order to mock the journal, we can't mock final method of java.lang.Thread class

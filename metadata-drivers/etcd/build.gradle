@@ -24,7 +24,7 @@ plugins {
 dependencies {
     implementation project(":bookkeeper-server")
     implementation project(":bookkeeper-common")
-    implementation project(":bookkeeper-stats")
+    implementation project(":stats:bookkeeper-stats-api")
     implementation depLibs.etcd
     implementation depLibs.commonsConfiguration
     implementation depLibs.commonsLang3
@@ -36,6 +36,7 @@ dependencies {
     testImplementation depLibs.arquillianCubeDocker
     testImplementation depLibs.arquillianJunitStandalone
     testImplementation depLibs.testcontainers
+    testImplementation project(':testtools')
     testImplementation project(path: ':bookkeeper-common', configuration: 'testArtifacts')
     testImplementation project(path: ':bookkeeper-server', configuration: 'testArtifacts')
     testImplementation depLibs.dockerJava

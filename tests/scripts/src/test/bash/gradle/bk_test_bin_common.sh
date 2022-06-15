@@ -27,13 +27,11 @@
 #
 
 testDefaultVariables() {
-  source ${BK_BINDIR}/common.sh
+  source ${BK_BINDIR}/common_gradle.sh
   assertEquals "BINDIR is not set correctly" "${BK_BINDIR}" "${BINDIR}"
   assertEquals "BK_HOME is not set correctly" "${BK_HOMEDIR}" "${BK_HOME}"
-  assertEquals "DEFAULT_LOG_CONF is not set correctly" "${BK_CONFDIR}/log4j.properties" "${DEFAULT_LOG_CONF}"
+  assertEquals "DEFAULT_LOG_CONF is not set correctly" "${BK_CONFDIR}/log4j2.xml" "${DEFAULT_LOG_CONF}"
   assertEquals "NETTY_LEAK_DETECTION_LEVEL is not set correctly" "disabled" "${NETTY_LEAK_DETECTION_LEVEL}"
-  assertEquals "NETTY_RECYCLER_MAXCAPACITY is not set correctly" "1000" "${NETTY_RECYCLER_MAXCAPACITY}"
-  assertEquals "NETTY_RECYCLER_LINKCAPACITY is not set correctly" "1024" "${NETTY_RECYCLER_LINKCAPACITY}"
   assertEquals "BOOKIE_MAX_HEAP_MEMORY is not set correctly" "1g" "${BOOKIE_MAX_HEAP_MEMORY}"
   assertEquals "BOOKIE_MIN_HEAP_MEMORY is not set correctly" "1g" "${BOOKIE_MIN_HEAP_MEMORY}"
   assertEquals "BOOKIE_MAX_DIRECT_MEMORY is not set correctly" "2g" "${BOOKIE_MAX_DIRECT_MEMORY}"
@@ -48,7 +46,7 @@ testDefaultVariables() {
 }
 
 testFindModuleJarAt() {
-  source ${BK_BINDIR}/common.sh
+  source ${BK_BINDIR}/common_gradle.sh
 
   MODULE="test-module"
 
@@ -113,7 +111,7 @@ testFindModuleJar() {
   echo "" > ${BK_HOME}/conf/bkenv.sh
   echo "" > ${BK_HOME}/conf/bk_cli_env.sh
 
-  source ${BK_BINDIR}/common.sh
+  source ${BK_BINDIR}/common_gradle.sh
 
   MODULE="test-module"
   MODULE_PATH="testmodule"
@@ -159,7 +157,7 @@ testLoadEnvfiles() {
   echo "CLI_MAX_HEAP_MEMORY=2048M" > ${BK_HOME}/conf/bk_cli_env.sh
 
   # load the common_gradle.sh
-  source ${BK_BINDIR}/common.sh
+  source ${BK_BINDIR}/common_gradle.sh
 
   assertEquals "NETTY_LEAK_DETECTION_LEVEL is not set correctly" "enabled" "${NETTY_LEAK_DETECTION_LEVEL}"
   assertEquals "BOOKIE_MAX_HEAP_MEMORY is not set correctly" "2048M" "${BOOKIE_MAX_HEAP_MEMORY}"
@@ -172,7 +170,7 @@ testLoadEnvfiles() {
 }
 
 testBuildBookieJVMOpts() {
-  source ${BK_BINDIR}/common.sh
+  source ${BK_BINDIR}/common_gradle.sh
 
   TEST_LOG_DIR=${BK_TMPDIR}/logdir
   TEST_GC_LOG_FILENAME="test-gc.log"
@@ -187,7 +185,7 @@ testBuildBookieJVMOpts() {
 }
 
 testBuildCLIJVMOpts() {
-  source ${BK_BINDIR}/common.sh
+  source ${BK_BINDIR}/common_gradle.sh
 
   TEST_LOG_DIR=${BK_TMPDIR}/logdir
   TEST_GC_LOG_FILENAME="test-gc.log"
@@ -202,21 +200,29 @@ testBuildCLIJVMOpts() {
 }
 
 testBuildNettyOpts() {
-  source ${BK_BINDIR}/common.sh
+  source ${BK_BINDIR}/common_gradle.sh
 
   ACTUAL_NETTY_OPTS=$(build_netty_opts)
-  EXPECTED_NETTY_OPTS="-Dio.netty.leakDetectionLevel=disabled \
-    -Dio.netty.recycler.maxCapacity.default=1000 \
-    -Dio.netty.recycler.linkCapacity=1024"
+  EXPECTED_NETTY_OPTS=""
+  if [ "$USING_JDK8" -ne "1" ]; then
+      EXPECTED_NETTY_OPTS="-Dio.netty.leakDetectionLevel=disabled -Dio.netty.tryReflectionSetAccessible=true --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/jdk.internal.misc=ALL-UNNAMED"
+  else
+      EXPECTED_NETTY_OPTS="-Dio.netty.leakDetectionLevel=disabled -Dio.netty.tryReflectionSetAccessible=true"
+  fi
 
     assertEquals "Netty OPTS is not set correctly" "${EXPECTED_NETTY_OPTS}" "${ACTUAL_NETTY_OPTS}"
 }
 
 testBuildBookieOpts() {
-  source ${BK_BINDIR}/common.sh
+  source ${BK_BINDIR}/common_gradle.sh
 
   ACTUAL_OPTS=$(build_bookie_opts)
-  EXPECTED_OPTS="-Djava.net.preferIPv4Stack=true"
+  USEJDK8=$(detect_jdk8)
+  if [ "$USING_JDK8" -ne "1" ]; then
+    EXPECTED_OPTS="-Djava.net.preferIPv4Stack=true --add-opens java.base/java.io=ALL-UNNAMED --add-opens java.base/java.util.zip=ALL-UNNAMED"
+  else
+    EXPECTED_OPTS="-Djava.net.preferIPv4Stack=true"
+  fi
 
   assertEquals "Bookie OPTS is not set correctly" "${EXPECTED_OPTS}" "${ACTUAL_OPTS}"
 }
@@ -225,28 +231,32 @@ testBuildLoggingOpts() {
   TEST_CONF_FILE="test.conf"
   TEST_LOG_DIR="test_log_dir"
   TEST_LOG_FILE="test_log_file"
-  TEST_LOGGER="INFO,TEST"
+  TEST_LOG_LEVEL="INFO"
+  TEST_LOG_APPENDER="TEST"
 
-  EXPECTED_OPTS="-Dlog4j.configuration=${TEST_CONF_FILE} \
-    -Dbookkeeper.root.logger=${TEST_LOGGER} \
+  EXPECTED_OPTS="-Dlog4j.configurationFile=${TEST_CONF_FILE} \
+    -Dbookkeeper.log.root.level=${TEST_LOG_LEVEL} \
+    -Dbookkeeper.log.root.appender=${TEST_LOG_APPENDER} \
     -Dbookkeeper.log.dir=${TEST_LOG_DIR} \
     -Dbookkeeper.log.file=${TEST_LOG_FILE}"
-  ACTUAL_OPTS=$(build_logging_opts ${TEST_CONF_FILE} ${TEST_LOG_DIR} ${TEST_LOG_FILE} ${TEST_LOGGER})
+  ACTUAL_OPTS=$(build_logging_opts ${TEST_CONF_FILE} ${TEST_LOG_LEVEL} ${TEST_LOG_APPENDER} ${TEST_LOG_DIR} ${TEST_LOG_FILE})
 
   assertEquals "Logging OPTS is not set correctly" "${EXPECTED_OPTS}" "${ACTUAL_OPTS}"
 }
 
 testBuildCLILoggingOpts() {
   TEST_CONF_FILE="test.conf"
+  TEST_LOG_LEVEL="INFO"
+  TEST_LOG_APPENDER="TEST"
   TEST_LOG_DIR="test_log_dir"
   TEST_LOG_FILE="test_log_file"
-  TEST_LOGGER="INFO,TEST"
 
-  EXPECTED_OPTS="-Dlog4j.configuration=${TEST_CONF_FILE} \
-    -Dbookkeeper.cli.root.logger=${TEST_LOGGER} \
+  EXPECTED_OPTS="-Dlog4j.configurationFile=${TEST_CONF_FILE} \
+    -Dbookkeeper.cli.log.root.level=${TEST_LOG_LEVEL} \
+    -Dbookkeeper.cli.log.root.appender=${TEST_LOG_APPENDER} \
     -Dbookkeeper.cli.log.dir=${TEST_LOG_DIR} \
     -Dbookkeeper.cli.log.file=${TEST_LOG_FILE}"
-  ACTUAL_OPTS=$(build_cli_logging_opts ${TEST_CONF_FILE} ${TEST_LOG_DIR} ${TEST_LOG_FILE} ${TEST_LOGGER})
+  ACTUAL_OPTS=$(build_cli_logging_opts ${TEST_CONF_FILE} ${TEST_LOG_LEVEL} ${TEST_LOG_APPENDER} ${TEST_LOG_DIR} ${TEST_LOG_FILE})
 
   assertEquals "Logging OPTS is not set correctly" "${EXPECTED_OPTS}" "${ACTUAL_OPTS}"
 }

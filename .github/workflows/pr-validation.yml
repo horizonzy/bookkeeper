@@ -26,13 +26,12 @@ on:
       - master
       - branch-*
     paths-ignore:
-      - 'site/**'
       - 'site3/**'
     workflow_dispatch:
 
 env:
+  MAVEN_OPTS: -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=3
   GRADLE_ARGS: -Dtestlogger.theme=plain -DtestHideStandardOut=true
-
 
 jobs:
   check:
@@ -52,10 +51,10 @@ jobs:
           distribution: 'temurin'
           java-version: 11
       - name: Validate pull request
-        run: ./gradlew build -x signDistTar -x test ${GRADLE_ARGS}
+        run: mvn clean -B -nsu apache-rat:check checkstyle:check spotbugs:check package -Ddistributedlog -DskipTests -Dorg.slf4j.simpleLogger.defaultLogLevel=INFO
         
       - name: Check license files
         run: dev/check-all-licenses
 
       - name: Generate Javadoc
-        run: ./gradlew generateApiJavadoc
+        run: mvn clean -B -nsu -am -pl bookkeeper-common,bookkeeper-server,:bookkeeper-stats-api,:bookkeeper-stats-providers,:codahale-metrics-provider,:prometheus-metrics-provider install javadoc:aggregate -DskipTests -Pdelombok

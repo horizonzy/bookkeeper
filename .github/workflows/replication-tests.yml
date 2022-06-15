@@ -26,12 +26,11 @@ on:
       - master
       - branch-*
     paths-ignore:
-      - 'site/**'
       - 'site3/**'
     workflow_dispatch:
 
 env:
-  GRADLE_ARGS: -Dtestlogger.theme=plain -DtestHideStandardOut=true
+  MAVEN_OPTS: -Dmaven.wagon.httpconnectionManager.ttlSeconds=25 -Dmaven.wagon.http.retryHandler.count=3
 
 jobs:
   test:
@@ -51,7 +50,20 @@ jobs:
           distribution: 'temurin'
           java-version: 11
       - name: Run replication tests
-        run: ./gradlew bookkeeper-server:test --tests="org.apache.bookkeeper.replication.*" ${GRADLE_ARGS}
+        run: mvn -B -nsu -am -pl bookkeeper-server clean install test -Dtest="org.apache.bookkeeper.replication.**" -DfailIfNoTests=false -Dorg.slf4j.simpleLogger.defaultLogLevel=INFO
+
+      - name: Aggregates all test reports to ./test-reports and ./surefire-reports directories If failure
+        if: failure()
+        continue-on-error: true
+        uses: ./.github/actions/copy-test-reports
+
+      - name: Upload Surefire reports
+        uses: actions/upload-artifact@v3
+        if: failure()
+        continue-on-error: true
+        with:
+          name: replication-tests-reports
+          path: surefire-reports
 
       - name: print JVM thread dumps when cancelled
         if: cancelled()

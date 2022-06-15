@@ -85,6 +85,7 @@ allprojects {
     apply from: "$rootDir/dependencies.gradle"
     if (it.path != ':circe-checksum:src:main:circe'
         && it.path != ':cpu-affinity:src:main:affinity'
+        && it.path != ':native-io:src:main:native-io-jni'
         && it.name != 'src'
         && it.name != 'main') {
         apply plugin: 'java'
@@ -143,7 +144,6 @@ allprojects {
         }
 
         spotbugs {
-            toolVersion = '3.1.8'
             excludeFilter = file("$rootDir/buildtools/src/main/resources/bookkeeper/findbugsExclude.xml")
             reportLevel = 'high'
             spotbugsTest.enabled = false
@@ -158,11 +158,9 @@ allprojects {
         tasks.withType(Tar) {
             duplicatesStrategy = DuplicatesStrategy.EXCLUDE
         }
-
         tasks.withType(Zip) {
             duplicatesStrategy = DuplicatesStrategy.EXCLUDE
         }
-
         task testJar(type: Jar, dependsOn: testClasses) {
             archiveClassifier = 'tests'
             from sourceSets.test.output
@@ -195,7 +193,6 @@ allprojects {
                     '**/*.iml',
                     '**/*.iws',
                     '**/*.ipr',
-                    'site/**',
                     'site3/**',
                     '**/*.log',
                     'data/**',
@@ -311,12 +308,7 @@ allprojects {
         dependencies {
             implementation(enforcedPlatform(depLibs.nettyBom))
             testImplementation depLibs.log4jSlf4jImpl
-        }
-        tasks.register('writeClasspath') {
-            doLast {
-                buildDir.mkdirs()
-                new File(buildDir, "classpath.txt").text = sourceSets.main.runtimeClasspath.collect { it.absolutePath }.join(':') + "\n"
-            }
+            implementation(enforcedPlatform(depLibs.jacksonBom))
         }
 
         dependencies {
@@ -358,9 +350,9 @@ allprojects {
 def javadocProjects = [
         ":bookkeeper-common",
         ":bookkeeper-server",
-        ":bookkeeper-stats",
-        ":bookkeeper-stats-providers:prometheus-metrics-provider",
-        ":bookkeeper-stats-providers:codahale-metrics-provider",
+        ":stats:bookkeeper-stats-api",
+        ":stats:bookkeeper-stats-providers:codahale-metrics-provider",
+        ":stats:bookkeeper-stats-providers:prometheus-metrics-provider",
 ]
 
 task generateApiJavadoc(type: Javadoc) {

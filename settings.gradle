@@ -32,8 +32,6 @@ pluginManagement {
 
 rootProject.name = 'bookkeeper'
 
-
-
 include(':bookkeeper-benchmark',
         ':bookkeeper-tools',
         ':bookkeeper-tools-framework',
@@ -54,9 +52,9 @@ include(':bookkeeper-benchmark',
         'bookkeeper-server',
         'shaded:bookkeeper-server-shaded',
         'shaded:bookkeeper-server-tests-shaded',
+        ':bookkeeper-slogger:api',
+        ':bookkeeper-slogger:slf4j',
         'bookkeeper-stats',
-        'bookkeeper-stats-providers:prometheus-metrics-provider',
-        'bookkeeper-stats-providers:codahale-metrics-provider',
         'buildtools',
         'circe-checksum',
         'circe-checksum:src:main:circe',
@@ -65,7 +63,12 @@ include(':bookkeeper-benchmark',
         'dev:release',
         'microbenchmarks',
         'metadata-drivers:etcd',
+        'native-io',
+        'native-io:src:main:native-io-jni',
         'shaded:distributedlog-core-shaded',
+        'stats:bookkeeper-stats-api',
+        'stats:bookkeeper-stats-providers:prometheus-metrics-provider',
+        'stats:bookkeeper-stats-providers:codahale-metrics-provider',
         'stats:utils',
         'stream:api',
         'stream:clients:java:all',
@@ -101,7 +104,9 @@ include(':bookkeeper-benchmark',
         'tests:scripts',
         'tests:shaded:bookkeeper-server-shaded-test',
         'tests:shaded:bookkeeper-server-tests-shaded-test',
-        'tests:shaded:distributedlog-core-shaded-test')
+        'tests:shaded:distributedlog-core-shaded-test',
+        'testtools',
+)
 
 project(':bookkeeper-tools').projectDir = file('tools/all')
 project(':bookkeeper-tools-framework').projectDir = file('tools/framework')

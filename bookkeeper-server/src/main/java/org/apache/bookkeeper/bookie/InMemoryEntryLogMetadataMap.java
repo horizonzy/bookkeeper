@@ -30,7 +30,7 @@ import java.util.function.BiConsumer;
  */
 public class InMemoryEntryLogMetadataMap implements EntryLogMetadataMap {
 
-    private Map<Long, EntryLogMetadata> entryLogMetaMap = new ConcurrentHashMap<Long, EntryLogMetadata>();
+    private final Map<Long, EntryLogMetadata> entryLogMetaMap = new ConcurrentHashMap<>();
 
     @Override
     public boolean containsKey(long entryLogId) {
@@ -55,6 +55,16 @@ public class InMemoryEntryLogMetadataMap implements EntryLogMetadataMap {
     @Override
     public int size() {
         return entryLogMetaMap.size();
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return entryLogMetaMap.isEmpty();
+    }
+
+    @Override
+    public void clear() {
+        entryLogMetaMap.clear();
     }
 
     @Override

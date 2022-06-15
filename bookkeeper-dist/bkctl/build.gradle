@@ -33,7 +33,7 @@ dependencies {
         exclude group: 'log4j', module: 'log4j'
         exclude group: 'org.slf4j', module: 'slf4j-log4j12'
     }
-    runtimeOnly (project(':bookkeeper-stats-providers:codahale-metrics-provider')) {
+    runtimeOnly (project(':stats:bookkeeper-stats-providers:codahale-metrics-provider')) {
        exclude group: "io.dropwizard.metrics", module: "metrics-graphite"
        exclude group: "io.dropwizard.metrics", module: "metrics-jvm"
     }
@@ -49,8 +49,8 @@ releaseArtifacts {
 def depLicences = [
         "checker-qual-3.5.0/LICENSE",
         "google-auth-library-credentials-0.20.0/LICENSE",
-        "netty-4.1.74.Final/*",
-        "bouncycastle-1.0.2.1/LICENSE.html",
+        "netty-4.1.77.Final/*",
+        "bouncycastle-1.0.2.3/LICENSE.html",
         "protobuf-3.14.0/LICENSE",
         "protobuf-3.12.0/LICENSE",
         "reactivestreams-1.0.3/LICENSE",
@@ -69,8 +69,8 @@ distributions {
                             "bk_server.conf",
                             "bkenv.sh",
                             "jaas_example.conf",
-                            "log4j.cli.properties",
-                            "log4j.shell.properties",
+                            "log4j2.cli.xml",
+                            "log4j2.shell.xml",
                             "nettyenv.sh",
                             "default_rocksdb.conf",
                             "entry_location_rocksdb.conf",

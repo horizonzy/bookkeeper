@@ -18,7 +18,7 @@
  */
 dependencies {
     implementation project(':bookkeeper-common')
-    implementation project(':bookkeeper-stats')
+    implementation project(':stats:bookkeeper-stats-api')
     implementation project(':stream:common')
     implementation project(':stream:proto')
 
@@ -30,6 +30,8 @@ dependencies {
     runtimeOnly depLibs.googleHTTPClient
     compileOnly depLibs.lombok
     implementation depLibs.slf4j
+
+    testImplementation project(':testtools')
 
     testImplementation depLibs.mockito
 

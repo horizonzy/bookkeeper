@@ -8,7 +8,7 @@ Apache BookKeeper is a scalable, fault tolerant and low latency storage service 
 
 It is suitable for being used in following scenarios:
 
-- WAL (Write-Ahead-Logging), e.g. HDFS NameNode.
+- WAL (Write-Ahead-Logging), e.g. HDFS NameNode, Pravega.
 - Message Store, e.g. Apache Pulsar.
 - Offset/Cursor Store, e.g. Apache Pulsar.
 - Object/Blob Store, e.g. storing state machine snapshots.
@@ -16,13 +16,13 @@ It is suitable for being used in following scenarios:
 ## Get Started
 
 * Checkout the project [website](https://bookkeeper.apache.org/).
-* *Concepts*: Start with the [basic concepts](https://bookkeeper.apache.org/docs/latest/getting-started/concepts/) of Apache BookKeeper.
+* *Concepts*: Start with the [basic concepts](https://bookkeeper.apache.org/docs/getting-started/concepts) of Apache BookKeeper.
   This will help you to fully understand the other parts of the documentation.
-* Follow the [Install](https://bookkeeper.apache.org/docs/latest/getting-started/installation/) guide to setup BookKeeper.
+* Follow the [Install](https://bookkeeper.apache.org/docs/getting-started/installation) guide to setup BookKeeper.
 
 ## Documentation
 
-Please visit the [Documentation](https://bookkeeper.apache.org/docs/latest/overview/overview/) from the project website for more information.
+Please visit the [Documentation](https://bookkeeper.apache.org/docs/overview/) from the project website for more information.
 
 ## Get In Touch
 
@@ -44,7 +44,7 @@ We feel that a welcoming open community is important and welcome contributions.
 
 ### Contributing Code
 
-1. See our [installation guide](https://bookkeeper.apache.org/docs/latest/getting-started/installation/) to get your local environment setup.
+1. See our [installation guide](https://bookkeeper.apache.org/docs/next/getting-started/installation/) to get your local environment setup.
 
 2. Take a look at our open issues: [Github Issues](https://github.com/apache/bookkeeper/issues).
 

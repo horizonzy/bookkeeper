@@ -22,6 +22,7 @@ package org.apache.bookkeeper.bookie.storage.ldb;
 
 import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import java.io.File;
@@ -36,10 +37,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.bookkeeper.bookie.BookieImpl;
-import org.apache.bookkeeper.bookie.EntryLogger;
-import org.apache.bookkeeper.bookie.EntryLogger.EntryLogScanner;
+import org.apache.bookkeeper.bookie.DefaultEntryLogger;
 import org.apache.bookkeeper.bookie.Journal;
 import org.apache.bookkeeper.bookie.LedgerDirsManager;
+import org.apache.bookkeeper.bookie.storage.EntryLogScanner;
 import org.apache.bookkeeper.bookie.storage.ldb.KeyValueStorageFactory.DbConfigType;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.util.BookKeeperConstants;
@@ -71,6 +72,7 @@ public class LedgersIndexRebuildOp {
         this.verbose = verbose;
     }
 
+    @SuppressFBWarnings("RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE")
     public boolean initiate()  {
         LOG.info("Starting ledger index rebuilding");
 
@@ -134,7 +136,7 @@ public class LedgersIndexRebuildOp {
     }
 
     private void scanEntryLogFiles(Set<Long> ledgers) throws IOException {
-        EntryLogger entryLogger = new EntryLogger(conf, new LedgerDirsManager(conf, conf.getLedgerDirs(),
+        DefaultEntryLogger entryLogger = new DefaultEntryLogger(conf, new LedgerDirsManager(conf, conf.getLedgerDirs(),
                 new DiskChecker(conf.getDiskUsageThreshold(), conf.getDiskUsageWarnThreshold())));
         Set<Long> entryLogs = entryLogger.getEntryLogsSet();
 

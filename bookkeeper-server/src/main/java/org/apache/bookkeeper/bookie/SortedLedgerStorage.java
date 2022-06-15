@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SortedLedgerStorage
         implements LedgerStorage, CacheCallback, SkipListFlusher,
-            CompactableLedgerStorage, EntryLogger.EntryLogListener {
+            CompactableLedgerStorage, DefaultEntryLogger.EntryLogListener {
     private static final Logger LOG = LoggerFactory.getLogger(SortedLedgerStorage.class);
 
     EntryMemTable memTable;
@@ -340,8 +340,7 @@ public class SortedLedgerStorage
         return (BookieStateManager) stateManager;
     }
 
-    @Override
-    public EntryLogger getEntryLogger() {
+    public DefaultEntryLogger getEntryLogger() {
         return interleavedLedgerStorage.getEntryLogger();
     }
 
@@ -368,6 +367,11 @@ public class SortedLedgerStorage
     @Override
     public void forceGC() {
         interleavedLedgerStorage.forceGC();
+    }
+
+    @Override
+    public void forceGC(Boolean forceMajor, Boolean forceMinor) {
+        interleavedLedgerStorage.forceGC(forceMajor, forceMinor);
     }
 
     @Override

@@ -3,33 +3,19 @@ id: releases
 title: Apache BookKeeper Releases
 ---
 
-Version **{{ site.latest_release }}** is the [latest release](#latest-release) of BookKeeper. The current [stable version](#latest-stable-release) is **{{ site.stable_release }}**.
-
-> You can verify your download by following these [procedures](http://www.apache.org/info/verification.html) and using these [KEYS]({{ site.dist_base_url }}/KEYS).
-
-If you want to download older, archived releases, they are available in the [Apache archive](http://archive.apache.org/dist/bookkeeper/).
+Version **{{ site.latest_release }}** is the latest release of BookKeeper. The current stable version is **{{ site.stable_release }}**.
 
 [Release notes](/release-notes#)
-## Latest release (version {{ site.latest_release }}) {#latest-release}
-
-Release | Link | Crypto files
-:-------|:-----|:------------
-Source | [bookkeeper-{{ site.latest_release }}-src.tar.gz]({{ site.mirror_base_url }}/bookkeeper-{{ site.latest_release }}/bookkeeper-{{ site.latest_release }}-src.tar.gz) | [asc]({{ site.dist_base_url }}/bookkeeper-{{ site.latest_release }}/bookkeeper-{{ site.latest_release }}-src.tar.gz.asc), [sha512]({{ site.dist_base_url }}/bookkeeper-{{ site.latest_release }}/bookkeeper-{{ site.latest_release }}-src.tar.gz.sha512)
-Binary | [bookkeeper-server-{{ site.latest_release }}-bin.tar.gz]({{ site.mirror_base_url }}/bookkeeper-{{ site.latest_release }}/bookkeeper-server-{{ site.latest_release }}-bin.tar.gz) | [asc]({{ site.dist_base_url }}/bookkeeper-{{ site.latest_release }}/bookkeeper-server-{{ site.latest_release }}-bin.tar.gz.asc), [sha512]({{ site.dist_base_url }}/bookkeeper-{{ site.latest_release }}/bookkeeper-server-{{ site.latest_release }}-bin.tar.gz.sha512)
-
-## Latest stable release (version {{ site.stable_release }}) {#latest-stable-release}
-
-Release | Link | Crypto files
-:-------|:-----|:------------
-Source | [bookkeeper-{{ site.stable_release }}-src.tar.gz]({{ site.archive_base_url }}/bookkeeper-{{ site.stable_release }}/bookkeeper-{{ site.stable_release }}-src.tar.gz) | [asc]({{ site.archive_base_url }}/bookkeeper-{{ site.stable_release }}/bookkeeper-{{ site.stable_release }}-src.tar.gz.asc), [sha1]({{ site.archive_base_url }}/bookkeeper-{{ site.stable_release }}/bookkeeper-{{ site.stable_release }}-src.tar.gz.sha1)
-Binary | [bookkeeper-server-{{ site.stable_release }}-bin.tar.gz]({{ site.archive_base_url }}/bookkeeper-{{ site.stable_release }}/bookkeeper-server-{{ site.stable_release }}-bin.tar.gz) | [asc]({{ site.archive_base_url }}/bookkeeper-{{ site.stable_release }}/bookkeeper-server-{{ site.stable_release }}-bin.tar.gz.asc), [sha1]({{ site.archive_base_url }}/bookkeeper-{{ site.stable_release }}/bookkeeper-server-{{ site.stable_release }}-bin.tar.gz.sha1)
-
-## Recent releases
-
 
 import RecentReleases from "@site/src/components/RecentReleases"
 
 <RecentReleases />
+
+## Release Integrity
+You must [verify](https://www.apache.org/info/verification.html) the integrity of the downloaded files. We provide OpenPGP signatures for every release file. This signature should be matched against the [KEYS]({{ site.dist_base_url }}/KEYS) file which contains the OpenPGP keys of BookKeeper's Release Managers. We also provide SHA-512 checksums for every release file. After you download the file, you should calculate a checksum for your download, and make sure it is the same as ours.
+
+If you want to download older, archived releases, they are available in the [Apache archive](http://archive.apache.org/dist/bookkeeper/).
+
 
 ## Getting Started
 
@@ -44,6 +30,26 @@ Client Guide | API docs
 [The DistributedLog Library](docs/api/distributedlog-api) | [Javadoc](https://distributedlog.io/docs/latest/api/java)
 
 ## News
+
+### 9 May, 2022 Release 4.15.0 available
+
+This is the 31st release of Apache BookKeeper !
+See [BookKeeper 4.15.0 Release Notes](/release-notes#4150) for details.
+
+### 22 December, 2021 Release 4.14.4 available
+
+This is the 30th release of Apache BookKeeper !
+See [BookKeeper 4.14.4 Release Notes](/release-notes#4144) for details.
+
+### 9 November, 2021 Release 4.14.3 available
+
+This is the 29th release of Apache BookKeeper !
+See [BookKeeper 4.14.3 Release Notes](/release-notes#4143) for details.
+
+### 23 August, 2021 Release 4.14.2 available
+
+This is the 28th release of Apache BookKeeper !
+See [BookKeeper 4.14.2 Release Notes](/release-notes#4142) for details.
 
 ### 31 May, 2021 Release 4.14.1 available
 

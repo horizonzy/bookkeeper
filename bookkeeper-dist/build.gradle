@@ -38,6 +38,7 @@ distributions {
                             "**/README.md",
                             "**/bin/**",
                             "**/conf/**",
+                            "**/pom.xml",
                             "**/src/**",
                             "deploy/**",
                             "doc/**",
@@ -62,7 +63,6 @@ distributions {
                             "**/.vertx",
                             ".git/**",
                             "dev/**",
-                            "site/**",
                             "**/src/generated/**"
                 }
             }

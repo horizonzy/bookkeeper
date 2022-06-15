@@ -32,7 +32,7 @@ dependencies {
     implementation project(':bookkeeper-common-allocator')
     implementation project(':bookkeeper-common')
     implementation project(':bookkeeper-server')
-    implementation project(':bookkeeper-stats')
+    implementation project(':stats:bookkeeper-stats-api')
     implementation project(':stream:clients:java:all')
     implementation project(':stream:clients:java:base')
     implementation project(':stream:common')
@@ -43,7 +43,7 @@ dependencies {
     implementation project(':stream:storage:api')
     implementation project(':stream:storage:impl')
 
-    implementation project(':bookkeeper-stats-providers:prometheus-metrics-provider')
+    implementation project(':stats:bookkeeper-stats-providers:prometheus-metrics-provider')
     runtimeOnly project(':bookkeeper-tools-ledger')
     runtimeOnly project(':bookkeeper-tools-stream')
     runtimeOnly project(':bookkeeper-http:vertx-http-server')
@@ -58,7 +58,6 @@ dependencies {
     implementation depLibs.zookeeper
     implementation depLibs.metricsCore
     implementation depLibs.snappy
-    implementation depLibs.log4j12api
     implementation depLibs.log4jSlf4jImpl
     implementation depLibs.log4jCore
     implementation depLibs.vertxCore
@@ -68,14 +67,20 @@ dependencies {
     compileOnly depLibs.javaAnnotations
 
     annotationProcessor depLibs.lombok
+
+    testImplementation project(':testtools')
 }
 
 application {
     mainClassName = "org.apache.bookkeeper.stream.cluster.StandaloneStarter"
 }
 
+task writeClasspath {
+    buildDir.mkdirs()
+    new File(buildDir, "classpath.txt").text = sourceSets.main.runtimeClasspath.collect { it.absolutePath }.join(':') + "\n"
+}
+
 jar {
-    dependsOn tasks.named("writeClasspath")
     archiveBaseName = 'stream-storage-server'
 }
 
