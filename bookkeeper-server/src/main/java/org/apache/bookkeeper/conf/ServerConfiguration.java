@@ -153,6 +153,7 @@ public class ServerConfiguration extends AbstractConfiguration<ServerConfigurati
     protected static final String JOURNAL_MAX_MEMORY_SIZE_MB = "journalMaxMemorySizeMb";
     protected static final String JOURNAL_PAGECACHE_FLUSH_INTERVAL_MSEC = "journalPageCacheFlushIntervalMSec";
     protected static final String JOURNAL_CHANNEL_PROVIDER = "journalChannelProvider";
+    protected static final String JOURNAL_REUSE_FILES = "journalReuseFiles";
     // backpressure control
     protected static final String MAX_ADDS_IN_PROGRESS_LIMIT = "maxAddsInProgressLimit";
     protected static final String MAX_READS_IN_PROGRESS_LIMIT = "maxReadsInProgressLimit";
@@ -187,6 +188,7 @@ public class ServerConfiguration extends AbstractConfiguration<ServerConfigurati
     protected static final String LOCK_RELEASE_OF_FAILED_LEDGER_GRACE_PERIOD = "lockReleaseOfFailedLedgerGracePeriod";
     //ReadOnly mode support on all disk full
     protected static final String READ_ONLY_MODE_ENABLED = "readOnlyModeEnabled";
+    protected static final String READ_ONLY_MODE_ON_ANY_DISK_FULL_ENABLED = "readOnlyModeOnAnyDiskFullEnabled";
     //Whether the bookie is force started in ReadOnly mode
     protected static final String FORCE_READ_ONLY_BOOKIE = "forceReadOnlyBookie";
     //Whether to persist the bookie status
@@ -943,7 +945,7 @@ public class ServerConfiguration extends AbstractConfiguration<ServerConfigurati
      */
     public long getJournalMaxMemorySizeMb() {
         // Default is taking 5% of max direct memory (and convert to MB).
-        long defaultValue = (long) (PlatformDependent.maxDirectMemory() * 0.05 / 1024 / 1024);
+        long defaultValue = (long) (PlatformDependent.estimateMaxDirectMemory() * 0.05 / 1024 / 1024);
         return this.getLong(JOURNAL_MAX_MEMORY_SIZE_MB, defaultValue);
     }
 
@@ -986,6 +988,24 @@ public class ServerConfiguration extends AbstractConfiguration<ServerConfigurati
      */
     public String getJournalChannelProvider() {
         return this.getString(JOURNAL_CHANNEL_PROVIDER, "org.apache.bookkeeper.bookie.DefaultFileChannelProvider");
+    }
+
+    /**
+     * Get reuse journal files.
+     * @return
+     */
+    public boolean getJournalReuseFiles() {
+        return this.getBoolean(JOURNAL_REUSE_FILES, false);
+    }
+
+    /**
+     * Set reuse journal files.
+     * @param journalReuseFiles
+     * @return
+     */
+    public ServerConfiguration setJournalReuseFiles(boolean journalReuseFiles) {
+        setProperty(JOURNAL_REUSE_FILES, journalReuseFiles);
+        return this;
     }
 
     /**
@@ -2393,6 +2413,27 @@ public class ServerConfiguration extends AbstractConfiguration<ServerConfigurati
      */
     public boolean isReadOnlyModeEnabled() {
         return getBoolean(READ_ONLY_MODE_ENABLED, true);
+    }
+
+    /**
+     * Set whether the bookie is able to go into read-only mode when any disk is full.
+     * If this set to false, it will behave to READ_ONLY_MODE_ENABLED flag.
+     *
+     * @param enabled whether to enable read-only mode when any disk is full.
+     * @return
+     */
+    public ServerConfiguration setReadOnlyModeOnAnyDiskFullEnabled(boolean enabled) {
+        setProperty(READ_ONLY_MODE_ON_ANY_DISK_FULL_ENABLED, enabled);
+        return this;
+    }
+
+    /**
+     * Get whether read-only mode is enable when any disk is full. The default is false.
+     *
+     * @return boolean
+     */
+    public boolean isReadOnlyModeOnAnyDiskFullEnabled() {
+        return getBoolean(READ_ONLY_MODE_ON_ANY_DISK_FULL_ENABLED, false);
     }
 
     /**
