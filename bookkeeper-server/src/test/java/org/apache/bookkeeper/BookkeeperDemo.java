@@ -28,24 +28,24 @@ import org.apache.bookkeeper.client.LedgerEntry;
 import org.apache.bookkeeper.client.LedgerHandle;
 
 public class BookkeeperDemo {
-
+    
     public static void main(String[] args) throws BKException, IOException, InterruptedException {
         BookKeeper bkc = new BookKeeper("127.0.0.1:2181");
-
+        
         LedgerHandle lh = bkc.createLedger(3, 3, 2, BookKeeper.DigestType.MAC, "".getBytes(StandardCharsets.UTF_8));
         ByteBuffer entry = ByteBuffer.allocate(4);
-
+        
         int numberOfEntries = 100;
         for (int i = 0; i < numberOfEntries; i++) {
             entry.putInt(i);
             entry.position(0);
             lh.addEntry(entry.array());
         }
-
+        
         System.in.read();
         lh.close();
         bkc.close();
-
+        
     }
-
+    
 }
