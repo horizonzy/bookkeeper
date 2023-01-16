@@ -27,6 +27,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+
 import com.google.common.collect.Lists;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -60,6 +61,7 @@ import org.apache.bookkeeper.bookie.EntryLocation;
 import org.apache.bookkeeper.bookie.GarbageCollector;
 import org.apache.bookkeeper.bookie.LastAddConfirmedUpdateNotification;
 import org.apache.bookkeeper.bookie.LedgerDirsManager;
+import org.apache.bookkeeper.bookie.LedgerStorageNotificationListener;
 import org.apache.bookkeeper.bookie.ScanAndCompareGarbageCollector;
 import org.apache.bookkeeper.bookie.StateManager;
 import org.apache.bookkeeper.client.BKException;
@@ -587,6 +589,11 @@ public class GcLedgersTest extends LedgerManagerTestCase {
         public void setCheckpointSource(CheckpointSource checkpointSource) {}
         @Override
         public void setCheckpointer(Checkpointer checkpointer) {}
+
+        @Override
+        public void setStorageStorageNotificationListener(LedgerStorageNotificationListener storageListener) {
+
+        }
 
         @Override
         public void start() {

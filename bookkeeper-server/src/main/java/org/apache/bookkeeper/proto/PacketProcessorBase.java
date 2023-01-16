@@ -18,13 +18,13 @@
 package org.apache.bookkeeper.proto;
 
 import io.netty.channel.Channel;
-
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelPromise;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.bookkeeper.proto.BookieProtocol.Request;
 import org.apache.bookkeeper.stats.OpStatsLogger;
 import org.apache.bookkeeper.util.MathUtils;
-import org.apache.bookkeeper.util.SafeRunnable;
 import org.apache.bookkeeper.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 /**
  * A base class for bookeeper packet processors.
  */
-abstract class PacketProcessorBase<T extends Request> extends SafeRunnable {
+abstract class PacketProcessorBase<T extends Request> implements Runnable {
     private static final Logger logger = LoggerFactory.getLogger(PacketProcessorBase.class);
     T request;
     Channel channel;
@@ -105,11 +105,14 @@ abstract class PacketProcessorBase<T extends Request> extends SafeRunnable {
             }
 
             if (!channel.isWritable()) {
-                LOGGER.warn("cannot write response to non-writable channel {} for request {}", channel,
+                logger.warn("cannot write response to non-writable channel {} for request {}", channel,
                     StringUtils.requestToString(request));
                 requestProcessor.getRequestStats().getChannelWriteStats()
                     .registerFailedEvent(MathUtils.elapsedNanos(writeNanos), TimeUnit.NANOSECONDS);
                 statsLogger.registerFailedEvent(MathUtils.elapsedNanos(enqueueNanos), TimeUnit.NANOSECONDS);
+                if (response instanceof BookieProtocol.Response) {
+                    ((BookieProtocol.Response) response).release();
+                }
                 return;
             } else {
                 requestProcessor.invalidateBlacklist(channel);
@@ -117,9 +120,17 @@ abstract class PacketProcessorBase<T extends Request> extends SafeRunnable {
         }
 
         if (channel.isActive()) {
-            channel.writeAndFlush(response, channel.voidPromise());
+            ChannelPromise promise = channel.newPromise().addListener(future -> {
+                if (!future.isSuccess()) {
+                    logger.debug("Netty channel write exception. ", future.cause());
+                }
+            });
+            channel.writeAndFlush(response, promise);
         } else {
-            LOGGER.debug("Netty channel {} is inactive, "
+            if (response instanceof BookieProtocol.Response) {
+                ((BookieProtocol.Response) response).release();
+            }
+            logger.debug("Netty channel {} is inactive, "
                     + "hence bypassing netty channel writeAndFlush during sendResponse", channel);
         }
         if (BookieProtocol.EOK == rc) {
@@ -138,11 +149,14 @@ abstract class PacketProcessorBase<T extends Request> extends SafeRunnable {
      */
     protected void sendResponseAndWait(int rc, Object response, OpStatsLogger statsLogger) {
         try {
-            channel.writeAndFlush(response).await();
-        } catch (InterruptedException e) {
+            ChannelFuture future = channel.writeAndFlush(response);
+            if (!channel.eventLoop().inEventLoop()) {
+                future.get();
+            }
+        } catch (ExecutionException | InterruptedException e) {
+            logger.debug("Netty channel write exception. ", e);
             return;
         }
-
         if (BookieProtocol.EOK == rc) {
             statsLogger.registerSuccessfulEvent(MathUtils.elapsedNanos(enqueueNanos), TimeUnit.NANOSECONDS);
         } else {
@@ -151,7 +165,7 @@ abstract class PacketProcessorBase<T extends Request> extends SafeRunnable {
     }
 
     @Override
-    public void safeRun() {
+    public void run() {
         requestProcessor.getRequestStats().getWriteThreadQueuedLatency()
                 .registerSuccessfulEvent(MathUtils.elapsedNanos(enqueueNanos), TimeUnit.NANOSECONDS);
         if (!isVersionCompatible()) {

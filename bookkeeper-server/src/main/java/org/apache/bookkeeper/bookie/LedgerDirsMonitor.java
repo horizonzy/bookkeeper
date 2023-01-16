@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentMap;
-
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -137,11 +136,11 @@ class LedgerDirsMonitor {
                 float totalDiskUsage = diskChecker.getTotalDiskUsage(ldm.getAllLedgerDirs());
                 if (totalDiskUsage < conf.getDiskLowWaterMarkUsageThreshold()) {
                     makeWritable = true;
-                } else {
+                } else if (LOG.isDebugEnabled()) {
                     LOG.debug(
-                        "Current TotalDiskUsage: {} is greater than LWMThreshold: {}."
-                                + " So not adding any filledDir to WritableDirsList",
-                        totalDiskUsage, conf.getDiskLowWaterMarkUsageThreshold());
+                            "Current TotalDiskUsage: {} is greater than LWMThreshold: {}."
+                                    + " So not adding any filledDir to WritableDirsList",
+                            totalDiskUsage, conf.getDiskLowWaterMarkUsageThreshold());
                 }
             }
             // Update all full-filled disk space usage
@@ -224,7 +223,7 @@ class LedgerDirsMonitor {
     public void shutdown() {
         LOG.info("Shutting down LedgerDirsMonitor");
         if (null != checkTask) {
-            if (checkTask.cancel(true)) {
+            if (checkTask.cancel(true) && LOG.isDebugEnabled()) {
                 LOG.debug("Failed to cancel check task in LedgerDirsMonitor");
             }
         }

@@ -19,10 +19,8 @@
 package org.apache.bookkeeper.client;
 
 import com.google.common.collect.Lists;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-
 import java.security.GeneralSecurityException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -32,7 +30,6 @@ import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
-
 import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
 import org.apache.bookkeeper.client.AsyncCallback.CloseCallback;
 import org.apache.bookkeeper.client.AsyncCallback.ReadCallback;
@@ -93,6 +90,11 @@ public class MockLedgerHandle extends LedgerHandle {
     }
 
     @Override
+    void executeOrdered(Runnable runnable) throws RejectedExecutionException {
+        bk.executor.execute(runnable);
+    }
+
+    @Override
     public void asyncReadEntries(final long firstEntry, final long lastEntry, final ReadCallback cb, final Object ctx) {
         if (bk.isStopped()) {
             cb.readComplete(-1, MockLedgerHandle.this, null, ctx);
@@ -105,19 +107,26 @@ public class MockLedgerHandle extends LedgerHandle {
                     cb.readComplete(bk.failReturnCode, MockLedgerHandle.this, null, ctx);
                     return;
                 } else if (bk.isStopped()) {
-                    log.debug("Bookkeeper is closed!");
+                    if (log.isDebugEnabled()) {
+                        log.debug("Bookkeeper is closed!");
+                    }
                     cb.readComplete(-1, MockLedgerHandle.this, null, ctx);
                     return;
                 }
 
-                log.debug("readEntries: first={} last={} total={}", firstEntry, lastEntry, entries.size());
+                if (log.isDebugEnabled()) {
+                    log.debug("readEntries: first={} last={} total={}",
+                            firstEntry, lastEntry, entries.size());
+                }
                 final Queue<LedgerEntry> seq = new ArrayDeque<LedgerEntry>();
                 long entryId = firstEntry;
                 while (entryId <= lastEntry && entryId < entries.size()) {
                     seq.add(new LedgerEntry(entries.get((int) entryId++).duplicate()));
                 }
 
-                log.debug("Entries read: {}", seq);
+                if (log.isDebugEnabled()) {
+                    log.debug("Entries read: {}", seq);
+                }
 
                 try {
                     Thread.sleep(1);

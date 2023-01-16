@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,6 +23,7 @@ package org.apache.bookkeeper.client;
 import static com.google.common.base.Preconditions.checkArgument;
 import static org.apache.bookkeeper.meta.MetadataDrivers.runFunctionWithMetadataBookieDriver;
 import static org.apache.bookkeeper.meta.MetadataDrivers.runFunctionWithRegistrationManager;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -32,8 +33,10 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -89,6 +92,7 @@ import org.apache.bookkeeper.stats.NullStatsLogger;
 import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.bookkeeper.util.AvailabilityOfEntriesOfLedger;
 import org.apache.bookkeeper.util.IOUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.zookeeper.AsyncCallback;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
@@ -1094,14 +1098,12 @@ public class BookKeeperAdmin implements AutoCloseable {
                             oldBookie,
                             bookiesToExclude);
             BookieId newBookie = replaceBookieResponse.getResult();
-            PlacementPolicyAdherence isEnsembleAdheringToPlacementPolicy = replaceBookieResponse.isAdheringToPolicy();
-            if (isEnsembleAdheringToPlacementPolicy == PlacementPolicyAdherence.FAIL) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug(
-                            "replaceBookie for bookie: {} in ensemble: {} "
-                                    + "is not adhering to placement policy and chose {}",
-                            oldBookie, ensemble, newBookie);
-                }
+            PlacementPolicyAdherence isEnsembleAdheringToPlacementPolicy = replaceBookieResponse.getAdheringToPolicy();
+            if (isEnsembleAdheringToPlacementPolicy == PlacementPolicyAdherence.FAIL && LOG.isDebugEnabled()) {
+                LOG.debug(
+                        "replaceBookie for bookie: {} in ensemble: {} "
+                                + "is not adhering to placement policy and chose {}",
+                        oldBookie, ensemble, newBookie);
             }
             targetBookieAddresses.put(bookieIndex, newBookie);
             bookiesToExclude.add(newBookie);
@@ -1128,14 +1130,23 @@ public class BookKeeperAdmin implements AutoCloseable {
      * @param ledgerFragment
      *            - LedgerFragment to replicate
      */
-    public void replicateLedgerFragment(LedgerHandle lh,
-            final LedgerFragment ledgerFragment,
-            final BiConsumer<Long, Long> onReadEntryFailureCallback)
-            throws InterruptedException, BKException {
-        Optional<Set<BookieId>> excludedBookies = Optional.empty();
-        Map<Integer, BookieId> targetBookieAddresses =
-                getReplacementBookiesByIndexes(lh, ledgerFragment.getEnsemble(),
-                        ledgerFragment.getBookiesIndexes(), excludedBookies);
+    public void replicateLedgerFragment(LedgerHandle lh, final LedgerFragment ledgerFragment,
+            final BiConsumer<Long, Long> onReadEntryFailureCallback) throws InterruptedException, BKException {
+        Map<Integer, BookieId> targetBookieAddresses = null;
+        if (LedgerFragment.ReplicateType.DATA_LOSS == ledgerFragment.getReplicateType()) {
+            Optional<Set<BookieId>> excludedBookies = Optional.empty();
+            targetBookieAddresses = getReplacementBookiesByIndexes(lh, ledgerFragment.getEnsemble(),
+                    ledgerFragment.getBookiesIndexes(), excludedBookies);
+        } else if (LedgerFragment.ReplicateType.DATA_NOT_ADHERING_PLACEMENT == ledgerFragment.getReplicateType()) {
+            targetBookieAddresses = replaceNotAdheringPlacementPolicyBookie(ledgerFragment.getEnsemble(),
+                    lh.getLedgerMetadata().getWriteQuorumSize(), lh.getLedgerMetadata().getAckQuorumSize());
+            ledgerFragment.getBookiesIndexes().addAll(targetBookieAddresses.keySet());
+        }
+        if (MapUtils.isEmpty(targetBookieAddresses)) {
+            LOG.warn("Could not replicate for {} ledger: {}, not find target bookie.",
+                    ledgerFragment.getReplicateType(), ledgerFragment.getLedgerId());
+            return;
+        }
         replicateLedgerFragment(lh, ledgerFragment, targetBookieAddresses, onReadEntryFailureCallback);
     }
 
@@ -1629,7 +1640,9 @@ public class BookKeeperAdmin implements AutoCloseable {
             int sleepTimeForThisCheck = (long) ledgers.size() * sleepTimePerLedger > maxSleepTimeInBetweenChecks
                     ? maxSleepTimeInBetweenChecks : ledgers.size() * sleepTimePerLedger;
             Thread.sleep(sleepTimeForThisCheck);
-            LOG.debug("Making sure following ledgers replication to be completed: {}", ledgers);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Making sure following ledgers replication to be completed: {}", ledgers);
+            }
             ledgers.removeIf(validateBookieIsNotPartOfEnsemble);
         }
     }
@@ -1646,7 +1659,9 @@ public class BookKeeperAdmin implements AutoCloseable {
             if (e.getCause() != null
                     && e.getCause().getClass()
                     .equals(BKException.BKNoSuchLedgerExistsOnMetadataServerException.class)) {
-                LOG.debug("Ledger: {} has been deleted", ledgerId);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Ledger: {} has been deleted", ledgerId);
+                }
                 return false;
             } else {
                 LOG.error("Got exception while trying to read LedgerMetadata of " + ledgerId, e);
@@ -1774,6 +1789,31 @@ public class BookKeeperAdmin implements AutoCloseable {
             int writeQuorumSize, int ackQuorumSize) {
         return bkc.getPlacementPolicy().isEnsembleAdheringToPlacementPolicy(ensembleBookiesList, writeQuorumSize,
                 ackQuorumSize);
+    }
+
+    public Map<Integer, BookieId> replaceNotAdheringPlacementPolicyBookie(List<BookieId> ensembleBookiesList,
+            int writeQuorumSize, int ackQuorumSize) {
+        try {
+            EnsemblePlacementPolicy.PlacementResult<List<BookieId>> placementResult = bkc.getPlacementPolicy()
+                    .replaceToAdherePlacementPolicy(ensembleBookiesList.size(), writeQuorumSize, ackQuorumSize,
+                            new HashSet<>(), ensembleBookiesList);
+            if (PlacementPolicyAdherence.FAIL != placementResult.getAdheringToPolicy()) {
+                Map<Integer, BookieId> targetMap = new HashMap<>();
+                List<BookieId> newEnsembles = placementResult.getResult();
+                for (int i = 0; i < ensembleBookiesList.size(); i++) {
+                    BookieId originBookie = ensembleBookiesList.get(i);
+                    BookieId newBookie = newEnsembles.get(i);
+                    if (!originBookie.equals(newBookie)) {
+                        targetMap.put(i, newBookie);
+                    }
+                }
+                return targetMap;
+            }
+        } catch (UnsupportedOperationException e) {
+            LOG.warn("The placement policy: {} didn't support replaceToAdherePlacementPolicy, "
+                    + "ignore replace not adhere bookie.", bkc.getPlacementPolicy().getClass().getName());
+        }
+        return Collections.emptyMap();
     }
 
     /**

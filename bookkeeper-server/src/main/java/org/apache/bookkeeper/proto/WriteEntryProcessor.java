@@ -21,10 +21,9 @@ import com.google.common.annotations.VisibleForTesting;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.util.Recycler;
-
+import io.netty.util.ReferenceCountUtil;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.bookkeeper.bookie.BookieException;
 import org.apache.bookkeeper.bookie.BookieException.OperationRejectedException;
 import org.apache.bookkeeper.net.BookieId;
@@ -103,7 +102,7 @@ class WriteEntryProcessor extends PacketProcessorBase<ParsedAddRequest> implemen
             // some bad request which cause unexpected exception
             rc = BookieProtocol.EBADREQ;
         } finally {
-            addData.release();
+            ReferenceCountUtil.safeRelease(addData);
         }
 
         if (rc != BookieProtocol.EOK) {

@@ -21,11 +21,17 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import java.io.StringWriter;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
 import lombok.Cleanup;
 import org.apache.bookkeeper.stats.Counter;
 import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.junit.Assert;
 import org.junit.Test;
 
 /**
@@ -94,7 +100,16 @@ public class TestPrometheusMetricsProvider {
         assertEquals(1L, counter.get().longValue());
         counter.dec();
         assertEquals(0L, counter.get().longValue());
-        counter.add(3);
+        counter.addCount(3);
+        assertEquals(3L, counter.get().longValue());
+    }
+
+    @Test
+    public void testCounter2() {
+        LongAdderCounter counter = new LongAdderCounter(Collections.emptyMap());
+        long value = counter.get();
+        assertEquals(0L, value);
+        counter.addLatency(3 * 1000 * 1000L, TimeUnit.NANOSECONDS);
         assertEquals(3L, counter.get().longValue());
     }
 
@@ -109,6 +124,41 @@ public class TestPrometheusMetricsProvider {
         assertSame(counter1, counter2);
 
         assertEquals(1, provider.counters.size());
+    }
+
+    @Test
+    public void testJvmDirectMemoryMetrics() throws Exception {
+        PropertiesConfiguration config = new PropertiesConfiguration();
+        config.setProperty(PrometheusMetricsProvider.PROMETHEUS_STATS_HTTP_ENABLE, true);
+        config.setProperty(PrometheusMetricsProvider.PROMETHEUS_STATS_HTTP_PORT, 0);
+        config.setProperty(PrometheusMetricsProvider.PROMETHEUS_STATS_HTTP_ADDRESS, "127.0.0.1");
+        ByteBuf byteBuf = ByteBufAllocator.DEFAULT.directBuffer(25);
+        PrometheusMetricsProvider provider = new PrometheusMetricsProvider();
+        try {
+            provider.start(config);
+            assertNotNull(provider.server);
+            StringWriter writer = new StringWriter();
+            provider.writeAllMetrics(writer);
+            String s = writer.toString();
+            String[] split = s.split(System.lineSeparator());
+            HashMap<String, String> map = new HashMap<>();
+            for (String str : split) {
+                String[] aux = str.split(" ");
+                map.put(aux[0], aux[1]);
+            }
+            String directBytesMax = map.get("jvm_memory_direct_bytes_max{}");
+            Assert.assertNotNull(directBytesMax);
+            Assert.assertNotEquals("Nan", directBytesMax);
+            Assert.assertNotEquals("-1", directBytesMax);
+            String directBytesUsed = map.get("jvm_memory_direct_bytes_used{}");
+            Assert.assertNotNull(directBytesUsed);
+            Assert.assertNotEquals("Nan", directBytesUsed);
+            Assert.assertTrue(Double.parseDouble(directBytesUsed) > 25);
+            // ensure byteBuffer doesn't gc
+            byteBuf.release();
+        } finally {
+            provider.stop();
+        }
     }
 
 }

@@ -23,10 +23,8 @@ package org.apache.bookkeeper.bookie;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.RateLimiter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-
 import java.io.IOException;
 import java.util.EnumSet;
 import java.util.List;
@@ -35,7 +33,6 @@ import java.util.PrimitiveIterator;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.bookkeeper.bookie.CheckpointSource.Checkpoint;
 import org.apache.bookkeeper.common.util.Watcher;
 import org.apache.bookkeeper.conf.ServerConfiguration;
@@ -119,6 +116,11 @@ public class SortedLedgerStorage
     @Override
     public void setCheckpointer(Checkpointer checkpointer) {
         interleavedLedgerStorage.setCheckpointer(checkpointer);
+    }
+
+    @Override
+    public void setStorageStorageNotificationListener(LedgerStorageNotificationListener storageNotificationListener) {
+        this.interleavedLedgerStorage.setStorageStorageNotificationListener(storageNotificationListener);
     }
 
     @VisibleForTesting
@@ -372,6 +374,36 @@ public class SortedLedgerStorage
     @Override
     public void forceGC(Boolean forceMajor, Boolean forceMinor) {
         interleavedLedgerStorage.forceGC(forceMajor, forceMinor);
+    }
+
+    @Override
+    public void suspendMinorGC() {
+        interleavedLedgerStorage.suspendMinorGC();
+    }
+
+    @Override
+    public void suspendMajorGC() {
+        interleavedLedgerStorage.suspendMajorGC();
+    }
+
+    @Override
+    public void resumeMinorGC() {
+        interleavedLedgerStorage.resumeMinorGC();
+    }
+
+    @Override
+    public void resumeMajorGC() {
+        interleavedLedgerStorage.resumeMajorGC();
+    }
+
+    @Override
+    public boolean isMajorGcSuspended() {
+        return interleavedLedgerStorage.isMajorGcSuspended();
+    }
+
+    @Override
+    public boolean isMinorGcSuspended() {
+        return interleavedLedgerStorage.isMinorGcSuspended();
     }
 
     @Override

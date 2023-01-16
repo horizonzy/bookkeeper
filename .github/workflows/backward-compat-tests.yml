@@ -25,8 +25,6 @@ on:
     branches:
       - master
       - branch-*
-    paths-ignore:
-      - 'site3/**'
     workflow_dispatch:
 
 env:
@@ -34,7 +32,7 @@ env:
 
 jobs:
   test:
-
+    name: Backward compatibility tests
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -44,16 +42,44 @@ jobs:
       - name: Tune Runner VM
         uses: ./.github/actions/tune-runner-vm
 
+      - name: Detect changed files
+        id: changes
+        uses: apache/pulsar-test-infra/paths-filter@master
+        with:
+          filters: .github/changes-filter.yaml
+          list-files: csv
+
+      - name: Check changed files
+        id: check_changes
+        run: |
+          echo "docs_only=${{ fromJSON(steps.changes.outputs.all_count) == fromJSON(steps.changes.outputs.docs_count) && fromJSON(steps.changes.outputs.docs_count) > 0 }}" >> $GITHUB_OUTPUT
+
+      - name: Cache local Maven repository
+        if: steps.check_changes.outputs.docs_only != 'true'
+        id: cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/bookkeeper
+            !~/.m2/repository/org/apache/distributedlog
+          key: ${{ runner.os }}-bookkeeper-all-${{ hashFiles('**/pom.xml') }}
+
       - name: Set up JDK 1.8
+        if: steps.check_changes.outputs.docs_only != 'true'
         uses: actions/setup-java@v1
         with:
           java-version: 1.8
       - name: Install Module
+        if: steps.check_changes.outputs.docs_only != 'true'
         run: mvn -B -nsu clean install -DskipTests
       - name: Test current server with old clients
+        if: steps.check_changes.outputs.docs_only != 'true'
         run: mvn -B -nsu -DintegrationTests -pl :backward-compat-current-server-old-clients test
       - name: Test progressive upgrade
+        if: steps.check_changes.outputs.docs_only != 'true'
         run: mvn -B -nsu -DintegrationTests -pl :upgrade test
       - name: Other tests
+        if: steps.check_changes.outputs.docs_only != 'true'
         run: |
           mvn -B -nsu -DintegrationTests -pl :bc-non-fips,:hierarchical-ledger-manager,:hostname-bookieid,:old-cookie-new-cluster,:recovery-no-password,:upgrade-direct,:yahoo-custom-version test

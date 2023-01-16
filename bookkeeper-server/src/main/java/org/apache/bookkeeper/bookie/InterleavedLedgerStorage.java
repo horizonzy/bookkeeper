@@ -33,11 +33,10 @@ import static org.apache.bookkeeper.bookie.BookKeeperServerStats.STORAGE_SCRUB_P
 
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.RateLimiter;
-
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-
+import io.netty.util.ReferenceCountUtil;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -51,10 +50,8 @@ import java.util.PrimitiveIterator.OfLong;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import lombok.Cleanup;
 import lombok.Getter;
-
 import org.apache.bookkeeper.bookie.Bookie.NoLedgerException;
 import org.apache.bookkeeper.bookie.CheckpointSource.Checkpoint;
 import org.apache.bookkeeper.bookie.DefaultEntryLogger.EntryLogListener;
@@ -177,6 +174,11 @@ public class InterleavedLedgerStorage implements CompactableLedgerStorage, Entry
         this.checkpointer = checkpointer;
     }
 
+    @Override
+    public void setStorageStorageNotificationListener(LedgerStorageNotificationListener storageNotificationListener) {
+        this.gcThread.setStorageStorageNotificationListener(storageNotificationListener);
+    }
+
     public void initializeWithEntryLogger(ServerConfiguration conf,
                 LedgerManager ledgerManager,
                 LedgerDirsManager ledgerDirsManager,
@@ -272,6 +274,30 @@ public class InterleavedLedgerStorage implements CompactableLedgerStorage, Entry
         return gcThread.isInForceGC();
     }
 
+    public void suspendMinorGC() {
+        gcThread.suspendMinorGC();
+    }
+
+    public void suspendMajorGC() {
+        gcThread.suspendMajorGC();
+    }
+
+    public void resumeMinorGC() {
+        gcThread.resumeMinorGC();
+    }
+
+    public void resumeMajorGC() {
+        gcThread.resumeMajorGC();
+    }
+
+    public boolean isMajorGcSuspended() {
+        return gcThread.isMajorGcSuspend();
+    }
+
+    public boolean isMinorGcSuspended() {
+        return gcThread.isMinorGcSuspend();
+    }
+
     @Override
     public void start() {
         gcThread.start();
@@ -349,7 +375,7 @@ public class InterleavedLedgerStorage implements CompactableLedgerStorage, Entry
                     lac = bb.readLong();
                     lac = ledgerCache.updateLastAddConfirmed(ledgerId, lac);
                 } finally {
-                    bb.release();
+                    ReferenceCountUtil.safeRelease(bb);
                 }
             }
         }
@@ -606,9 +632,15 @@ public class InterleavedLedgerStorage implements CompactableLedgerStorage, Entry
                                 if (version != lep.getVersion()) {
                                     pageRetries.increment();
                                     if (lep.isDeleted()) {
-                                        LOG.debug("localConsistencyCheck: ledger {} deleted", ledger);
+                                        if (LOG.isDebugEnabled()) {
+                                            LOG.debug("localConsistencyCheck: ledger {} deleted",
+                                                    ledger);
+                                        }
                                     } else {
-                                        LOG.debug("localConsistencyCheck: concurrent modification, retrying");
+                                        if (LOG.isDebugEnabled()) {
+                                            LOG.debug("localConsistencyCheck: "
+                                                    + "concurrent modification, retrying");
+                                        }
                                         retry.setValue(true);
                                         retryCounter.inc();
                                     }
@@ -636,7 +668,7 @@ public class InterleavedLedgerStorage implements CompactableLedgerStorage, Entry
                 if (activeLedgers.containsKey(ledger)) {
                     LOG.error("Cannot find ledger {}, should exist, exception is ", ledger, e);
                     errors.add(new DetectedInconsistency(ledger, -1, e));
-                } else {
+                } else if (LOG.isDebugEnabled()){
                     LOG.debug("ledger {} deleted since snapshot taken", ledger);
                 }
             } catch (Exception e) {

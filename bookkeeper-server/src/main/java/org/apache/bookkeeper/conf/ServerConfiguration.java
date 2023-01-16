@@ -56,6 +56,7 @@ import org.apache.commons.lang3.StringUtils;
  */
 public class ServerConfiguration extends AbstractConfiguration<ServerConfiguration> {
 
+    private static final int SECOND = 1000;
     // Ledger Storage Settings
 
     private static final ConfigKeyGroup GROUP_LEDGER_STORAGE = ConfigKeyGroup.builder("ledgerstorage")
@@ -181,6 +182,8 @@ public class ServerConfiguration extends AbstractConfiguration<ServerConfigurati
     protected static final String SERVER_SOCK_LINGER = "serverTcpLinger";
     protected static final String SERVER_WRITEBUFFER_LOW_WATER_MARK = "serverWriteBufferLowWaterMark";
     protected static final String SERVER_WRITEBUFFER_HIGH_WATER_MARK = "serverWriteBufferHighWaterMark";
+
+    protected static final String SERVER_NUM_ACCEPTOR_THREADS = "serverNumAcceptorThreads";
     protected static final String SERVER_NUM_IO_THREADS = "serverNumIOThreads";
 
     // Zookeeper Parameters
@@ -206,6 +209,8 @@ public class ServerConfiguration extends AbstractConfiguration<ServerConfigurati
     protected static final String AUDITOR_PERIODIC_BOOKIE_CHECK_INTERVAL = "auditorPeriodicBookieCheckInterval";
     protected static final String AUDITOR_PERIODIC_PLACEMENT_POLICY_CHECK_INTERVAL =
                                                                 "auditorPeriodicPlacementPolicyCheckInterval";
+    protected static final String REPAIRED_PLACEMENT_POLICY_NOT_ADHERING_BOOKIE_ENABLED =
+                                                                "repairedPlacementPolicyNotAdheringBookieEnabled";
     protected static final String AUDITOR_LEDGER_VERIFICATION_PERCENTAGE = "auditorLedgerVerificationPercentage";
     protected static final String AUTO_RECOVERY_DAEMON_ENABLED = "autoRecoveryDaemonEnabled";
     protected static final String LOST_BOOKIE_RECOVERY_DELAY = "lostBookieRecoveryDelay";
@@ -947,7 +952,8 @@ public class ServerConfiguration extends AbstractConfiguration<ServerConfigurati
      */
     public long getJournalMaxMemorySizeMb() {
         // Default is taking 5% of max direct memory (and convert to MB).
-        long defaultValue = (long) (PlatformDependent.estimateMaxDirectMemory() * 0.05 / 1024 / 1024);
+        long estimateMaxDirectMemory = io.netty.util.internal.PlatformDependent.estimateMaxDirectMemory();
+        long defaultValue = (long) (estimateMaxDirectMemory * 0.05 / 1024 / 1024);
         return this.getLong(JOURNAL_MAX_MEMORY_SIZE_MB, defaultValue);
     }
 
@@ -1495,6 +1501,15 @@ public class ServerConfiguration extends AbstractConfiguration<ServerConfigurati
      */
     public int getServerNumIOThreads() {
         return getInt(SERVER_NUM_IO_THREADS, 2 * Runtime.getRuntime().availableProcessors());
+    }
+
+    /**
+     * Get the number of Acceptor threads.
+     *
+     * @return the number of Acceptor threads
+     */
+    public int getServerNumAcceptorThreads() {
+        return getInt(SERVER_NUM_ACCEPTOR_THREADS, 1);
     }
 
     /**
@@ -2612,10 +2627,31 @@ public class ServerConfiguration extends AbstractConfiguration<ServerConfigurati
      * Get the regularity at which the auditor does placement policy check of
      * all ledgers, which are closed.
      *
-     * @return The interval in seconds. By default it is disabled.
+     * @return The interval in seconds. By default, it is disabled.
      */
     public long getAuditorPeriodicPlacementPolicyCheckInterval() {
         return getLong(AUDITOR_PERIODIC_PLACEMENT_POLICY_CHECK_INTERVAL, 0);
+    }
+
+    public void setRepairedPlacementPolicyNotAdheringBookieEnable(boolean enabled) {
+        setProperty(REPAIRED_PLACEMENT_POLICY_NOT_ADHERING_BOOKIE_ENABLED, enabled);
+    }
+
+    /**
+     * Now the feature only support RackawareEnsemblePlacementPolicy.
+     *
+     * In Auditor, it combines with {@link #getAuditorPeriodicPlacementPolicyCheckInterval}, to control is marked
+     * ledger id to under replication managed when found a ledger ensemble not adhere to placement policy.
+     * In ReplicationWorker, to control is to repair the ledger which the ensemble does not adhere to the placement
+     * policy. By default, it is disabled.
+     *
+     * If you want to enable this feature, there maybe lots of ledger will be mark underreplicated.
+     * The replicationWorker will replicate lots of ledger, it will increase read request and write request in bookie
+     * server. You should set a suitable rereplicationEntryBatchSize to avoid bookie server pressure.
+     *
+     */
+    public boolean isRepairedPlacementPolicyNotAdheringBookieEnable() {
+        return getBoolean(REPAIRED_PLACEMENT_POLICY_NOT_ADHERING_BOOKIE_ENABLED, false);
     }
 
     /**
@@ -3132,6 +3168,12 @@ public class ServerConfiguration extends AbstractConfiguration<ServerConfigurati
         if ((getJournalFormatVersionToWrite() >= 6) ^ (getFileInfoFormatVersionToWrite() >= 1)) {
             throw new ConfigurationException("For persisiting explicitLac, journalFormatVersionToWrite should be >= 6"
                     + "and FileInfoFormatVersionToWrite should be >= 1");
+        }
+        if (getMinorCompactionInterval() > 0 && getMinorCompactionInterval() * SECOND < getGcWaitTime()) {
+            throw new ConfigurationException("minorCompactionInterval should be >= gcWaitTime.");
+        }
+        if (getMajorCompactionInterval() > 0 && getMajorCompactionInterval() * SECOND < getGcWaitTime()) {
+            throw new ConfigurationException("majorCompactionInterval should be >= gcWaitTime.");
         }
     }
 

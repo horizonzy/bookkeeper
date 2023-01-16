@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,13 +25,11 @@ import static org.apache.bookkeeper.bookie.BookKeeperServerStats.WATCHER_SCOPE;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.concurrent.DefaultThreadFactory;
-
 import java.io.IOException;
 import java.net.URI;
 import java.util.Collections;
@@ -46,7 +44,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-
 import org.apache.bookkeeper.bookie.BookKeeperServerStats;
 import org.apache.bookkeeper.client.AsyncCallback.CreateCallback;
 import org.apache.bookkeeper.client.AsyncCallback.DeleteCallback;
@@ -91,7 +88,6 @@ import org.apache.bookkeeper.proto.DataFormats;
 import org.apache.bookkeeper.stats.NullStatsLogger;
 import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.bookkeeper.util.EventLoopUtil;
-import org.apache.bookkeeper.util.SafeRunnable;
 import org.apache.bookkeeper.versioning.Versioned;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.zookeeper.KeeperException;
@@ -497,8 +493,9 @@ public class BookKeeper implements org.apache.bookkeeper.client.api.BookKeeper {
             this.ownTimer = false;
         }
 
-        BookieAddressResolver bookieAddressResolver =
-                new DefaultBookieAddressResolver(metadataDriver.getRegistrationClient());
+        BookieAddressResolver bookieAddressResolver = conf.getBookieAddressResolverEnabled()
+                ? new DefaultBookieAddressResolver(metadataDriver.getRegistrationClient())
+                : new BookieAddressResolverDisabled();
         if (dnsResolver != null) {
             dnsResolver.setBookieAddressResolver(bookieAddressResolver);
         }
@@ -570,7 +567,7 @@ public class BookKeeper implements org.apache.bookkeeper.client.api.BookKeeper {
         bookieQuarantineRatio = 1.0;
     }
 
-    private EnsemblePlacementPolicy initializeEnsemblePlacementPolicy(ClientConfiguration conf,
+    protected EnsemblePlacementPolicy initializeEnsemblePlacementPolicy(ClientConfiguration conf,
                                                                       DNSToSwitchMapping dnsResolver,
                                                                       HashedWheelTimer timer,
                                                                       FeatureProvider featureProvider,
@@ -604,13 +601,10 @@ public class BookKeeper implements org.apache.bookkeeper.client.api.BookKeeper {
 
     void scheduleBookieHealthCheckIfEnabled(ClientConfiguration conf) {
         if (conf.isBookieHealthCheckEnabled()) {
-            scheduler.scheduleAtFixedRate(new SafeRunnable() {
-
-                @Override
-                public void safeRun() {
-                    checkForFaultyBookies();
-                }
-                    }, conf.getBookieHealthCheckIntervalSeconds(), conf.getBookieHealthCheckIntervalSeconds(),
+            scheduler.scheduleAtFixedRate(
+                    () -> checkForFaultyBookies(),
+                    conf.getBookieHealthCheckIntervalSeconds(),
+                    conf.getBookieHealthCheckIntervalSeconds(),
                     TimeUnit.SECONDS);
         }
     }

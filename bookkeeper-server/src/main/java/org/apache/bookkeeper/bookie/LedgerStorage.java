@@ -24,7 +24,6 @@ package org.apache.bookkeeper.bookie;
 import com.google.common.util.concurrent.RateLimiter;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,7 +31,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.PrimitiveIterator;
-
 import org.apache.bookkeeper.bookie.CheckpointSource.Checkpoint;
 import org.apache.bookkeeper.common.util.Watcher;
 import org.apache.bookkeeper.conf.ServerConfiguration;
@@ -62,6 +60,7 @@ public interface LedgerStorage {
     void setStateManager(StateManager stateManager);
     void setCheckpointSource(CheckpointSource checkpointSource);
     void setCheckpointer(Checkpointer checkpointer);
+    void setStorageStorageNotificationListener(LedgerStorageNotificationListener ledgerStorageNotificationListener);
 
     /**
      * Start any background threads belonging to the storage system. For example, garbage collection.
@@ -235,6 +234,30 @@ public interface LedgerStorage {
      */
     default void forceGC(Boolean forceMajor, Boolean forceMinor) {
         return;
+    }
+
+    default void suspendMinorGC() {
+        return;
+    }
+
+    default void suspendMajorGC() {
+        return;
+    }
+
+    default void resumeMinorGC() {
+        return;
+    }
+
+    default void resumeMajorGC() {
+        return;
+    }
+
+    default boolean isMajorGcSuspended() {
+        return false;
+    }
+
+    default boolean isMinorGcSuspended() {
+        return false;
     }
 
     /**

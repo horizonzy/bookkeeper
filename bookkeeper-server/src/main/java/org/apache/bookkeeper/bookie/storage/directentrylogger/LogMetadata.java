@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,12 +24,14 @@ import static org.apache.bookkeeper.common.util.ExceptionMessageHelper.exMsg;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.util.ReferenceCountUtil;
 import java.io.IOException;
 import org.apache.bookkeeper.bookie.EntryLogMetadata;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap.BiConsumerLong;
 
 class LogMetadata {
+
     /**
      * Ledgers map is composed of multiple parts that can be split into separated entries. Each of them is composed of:
      *
@@ -106,17 +108,16 @@ class LogMetadata {
                 throw e;
             }
         } finally {
-            serializedMap.release();
+            ReferenceCountUtil.safeRelease(serializedMap);
         }
-        writer.flush();
-
         ByteBuf buf = allocator.buffer(Buffer.ALIGNMENT);
         try {
             Header.writeHeader(buf, ledgerMapOffset, numberOfLedgers);
             writer.writeAt(0, buf);
         } finally {
-            buf.release();
+            ReferenceCountUtil.safeRelease(buf);
         }
+        writer.flush();
     }
 
     static EntryLogMetadata read(LogReader reader) throws IOException {
@@ -177,7 +178,7 @@ class LogMetadata {
                                               .toString());
                     }
                 } finally {
-                    ledgerMapBuffer.release();
+                    ReferenceCountUtil.safeRelease(ledgerMapBuffer);
                 }
             }
             return meta;
@@ -185,7 +186,7 @@ class LogMetadata {
             throw new IOException(exMsg("Error reading index").kv("logId", reader.logId())
                                   .kv("reason", ioe.getMessage()).toString(), ioe);
         } finally {
-            header.release();
+            ReferenceCountUtil.safeRelease(header);
         }
     }
 }

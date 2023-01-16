@@ -27,11 +27,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Sets;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.FastThreadLocal;
 import java.io.BufferedReader;
 import java.io.File;
@@ -57,7 +57,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.regex.Pattern;
-
 import org.apache.bookkeeper.bookie.storage.CompactionEntryLog;
 import org.apache.bookkeeper.bookie.storage.EntryLogScanner;
 import org.apache.bookkeeper.bookie.storage.EntryLogger;
@@ -69,7 +68,6 @@ import org.apache.bookkeeper.util.HardLink;
 import org.apache.bookkeeper.util.IOUtils;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap;
 import org.apache.bookkeeper.util.collections.ConcurrentLongLongHashMap.BiConsumerLong;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -193,7 +191,7 @@ public class DefaultEntryLogger implements EntryLogger {
                     throw e;
                 }
             } finally {
-                serializedMap.release();
+                ReferenceCountUtil.safeRelease(serializedMap);
             }
             // Flush the ledger's map out before we write the header.
             // Otherwise the header might point to something that is not fully
@@ -838,27 +836,18 @@ public class DefaultEntryLogger implements EntryLogger {
             if (validateEntry) {
                 validateEntry(ledgerId, entryId, entryLogId, pos, sizeBuff);
             }
-        } catch (EntryLookupException.MissingEntryException entryLookupError) {
-            throw new Bookie.NoEntryException("Short read from entrylog " + entryLogId,
-                    ledgerId, entryId);
         } catch (EntryLookupException e) {
-            throw new IOException(e.toString());
+            throw new IOException("Bad entry read from log file id: " + entryLogId, e);
         }
 
         ByteBuf data = allocator.buffer(entrySize, entrySize);
         int rc = readFromLogChannel(entryLogId, fc, data, pos);
         if (rc != entrySize) {
-            // Note that throwing NoEntryException here instead of IOException is not
-            // without risk. If all bookies in a quorum throw this same exception
-            // the client will assume that it has reached the end of the ledger.
-            // However, this may not be the case, as a very specific error condition
-            // could have occurred, where the length of the entry was corrupted on all
-            // replicas. However, the chance of this happening is very very low, so
-            // returning NoEntryException is mostly safe.
-            data.release();
-            throw new Bookie.NoEntryException("Short read for " + ledgerId + "@"
+            ReferenceCountUtil.safeRelease(data);
+            throw new IOException("Bad entry read from log file id: " + entryLogId,
+                    new EntryLookupException("Short read for " + ledgerId + "@"
                                               + entryId + " in " + entryLogId + "@"
-                                              + pos + "(" + rc + "!=" + entrySize + ")", ledgerId, entryId);
+                                              + pos + "(" + rc + "!=" + entrySize + ")"));
         }
         data.writerIndex(entrySize);
 
@@ -888,7 +877,7 @@ public class DefaultEntryLogger implements EntryLogger {
             int ledgersCount = headers.readInt();
             return new Header(headerVersion, ledgersMapOffset, ledgersCount);
         } finally {
-            headers.release();
+            ReferenceCountUtil.safeRelease(headers);
         }
     }
 
@@ -1037,7 +1026,7 @@ public class DefaultEntryLogger implements EntryLogger {
                 pos += entrySize;
             }
         } finally {
-            data.release();
+            ReferenceCountUtil.safeRelease(data);
         }
     }
 
@@ -1129,7 +1118,7 @@ public class DefaultEntryLogger implements EntryLogger {
         } catch (IndexOutOfBoundsException e) {
             throw new IOException(e);
         } finally {
-            ledgersMap.release();
+            ReferenceCountUtil.safeRelease(ledgersMap);
         }
 
         if (meta.getLedgersMap().size() != header.ledgersCount) {

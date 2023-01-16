@@ -19,6 +19,7 @@
 package org.apache.bookkeeper.server.http.service;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.common.collect.Lists;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.File;
@@ -100,7 +101,9 @@ public class ExpandStorageService implements HttpEndpointService {
             }
 
             String jsonResponse = "Success expand storage";
-            LOG.debug("output body:" + jsonResponse);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("output body:" + jsonResponse);
+            }
             response.setBody(jsonResponse);
             response.setCode(HttpServer.StatusCode.OK);
             return response;

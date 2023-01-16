@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,7 +22,6 @@ package org.apache.bookkeeper.bookie.storage.directentrylogger;
 
 import java.io.IOException;
 import java.util.concurrent.ArrayBlockingQueue;
-
 import org.apache.bookkeeper.common.util.nativeio.NativeIO;
 
 /**

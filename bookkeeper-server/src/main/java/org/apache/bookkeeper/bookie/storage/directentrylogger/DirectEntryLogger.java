@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,9 +28,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.util.ReferenceCountUtil;
 import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
@@ -48,7 +48,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.stream.Collectors;
-
 import org.apache.bookkeeper.bookie.AbstractLogCompactor;
 import org.apache.bookkeeper.bookie.Bookie.NoEntryException;
 import org.apache.bookkeeper.bookie.EntryLogMetadata;
@@ -457,7 +456,7 @@ public class DirectEntryLogger implements EntryLogger {
             writer.writeAt(0, buf);
             writer.position(buf.capacity());
         } finally {
-            buf.release();
+            ReferenceCountUtil.safeRelease(buf);
         }
         return writer;
     }

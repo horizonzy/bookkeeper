@@ -17,7 +17,6 @@
 package org.apache.bookkeeper.stats;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -89,7 +88,12 @@ public class NullStatsLogger implements StatsLogger {
         }
 
         @Override
-        public void add(long delta) {
+        public void addCount(long delta) {
+            // nop
+        }
+
+        @Override
+        public void addLatency(long eventLatency, TimeUnit unit) {
             // nop
         }
 

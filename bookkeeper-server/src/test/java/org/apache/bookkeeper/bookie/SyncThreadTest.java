@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,7 +27,6 @@ import static org.junit.Assert.fail;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-
 import java.io.IOException;
 import java.util.EnumSet;
 import java.util.PrimitiveIterator.OfLong;
@@ -285,6 +284,11 @@ public class SyncThreadTest {
         public void setCheckpointSource(CheckpointSource checkpointSource) {}
         @Override
         public void setCheckpointer(Checkpointer checkpointer) {}
+
+        @Override
+        public void setStorageStorageNotificationListener(LedgerStorageNotificationListener storageListener) {
+
+        }
 
         @Override
         public void deleteLedger(long ledgerId) throws IOException {

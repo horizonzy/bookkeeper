@@ -23,7 +23,6 @@ package org.apache.bookkeeper.meta;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
@@ -33,7 +32,6 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Optional;
 import java.util.PrimitiveIterator.OfLong;
-
 import org.apache.bookkeeper.bookie.BookieException;
 import org.apache.bookkeeper.bookie.CheckpointSource;
 import org.apache.bookkeeper.bookie.CheckpointSource.Checkpoint;
@@ -42,6 +40,7 @@ import org.apache.bookkeeper.bookie.CompactableLedgerStorage;
 import org.apache.bookkeeper.bookie.EntryLocation;
 import org.apache.bookkeeper.bookie.LastAddConfirmedUpdateNotification;
 import org.apache.bookkeeper.bookie.LedgerDirsManager;
+import org.apache.bookkeeper.bookie.LedgerStorageNotificationListener;
 import org.apache.bookkeeper.bookie.StateManager;
 import org.apache.bookkeeper.common.util.OrderedScheduler;
 import org.apache.bookkeeper.common.util.Watcher;
@@ -184,6 +183,11 @@ public abstract class LedgerManagerTestCase extends BookKeeperClusterTestCase {
         public void setCheckpointSource(CheckpointSource checkpointSource) {}
         @Override
         public void setCheckpointer(Checkpointer checkpointer) {}
+
+        @Override
+        public void setStorageStorageNotificationListener(LedgerStorageNotificationListener storageListener) {
+
+        }
 
         @Override
         public void start() {

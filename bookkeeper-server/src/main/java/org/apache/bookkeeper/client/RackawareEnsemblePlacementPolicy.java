@@ -21,7 +21,6 @@ import io.netty.util.HashedWheelTimer;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.bookkeeper.client.BKException.BKNotEnoughBookiesException;
 import org.apache.bookkeeper.net.BookieId;
 import org.apache.bookkeeper.net.BookieNode;
@@ -232,6 +231,28 @@ public class RackawareEnsemblePlacementPolicy extends RackawareEnsemblePlacement
             } else {
                 return slave.selectFromNetworkLocation(networkLoc, excludeRacks, excludeBookies, predicate, ensemble,
                         fallbackToRandom);
+            }
+        }
+    }
+
+    @Override
+    public PlacementResult<List<BookieId>> replaceToAdherePlacementPolicy(
+            int ensembleSize,
+            int writeQuorumSize,
+            int ackQuorumSize,
+            Set<BookieId> excludeBookies,
+            List<BookieId> currentEnsemble) {
+        final PlacementResult<List<BookieId>> placementResult =
+                super.replaceToAdherePlacementPolicy(ensembleSize, writeQuorumSize, ackQuorumSize,
+                        excludeBookies, currentEnsemble);
+        if (placementResult.getAdheringToPolicy() != PlacementPolicyAdherence.FAIL) {
+            return placementResult;
+        } else {
+            if (slave == null) {
+                return placementResult;
+            } else {
+                return slave.replaceToAdherePlacementPolicy(ensembleSize, writeQuorumSize, ackQuorumSize,
+                        excludeBookies, currentEnsemble);
             }
         }
     }

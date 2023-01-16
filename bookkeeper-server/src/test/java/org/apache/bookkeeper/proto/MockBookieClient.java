@@ -21,11 +21,9 @@
 package org.apache.bookkeeper.proto;
 
 import static org.apache.bookkeeper.proto.BookieProtocol.FLAG_RECOVERY_ADD;
-import static org.apache.bookkeeper.util.SafeRunnable.safeRun;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -33,7 +31,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.api.WriteFlag;
 import org.apache.bookkeeper.common.concurrent.FutureUtils;
@@ -48,7 +45,6 @@ import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.WriteCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.WriteLacCallback;
 import org.apache.bookkeeper.util.AvailabilityOfEntriesOfLedger;
 import org.apache.bookkeeper.util.ByteBufList;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,20 +136,14 @@ public class MockBookieClient implements BookieClient {
     public void forceLedger(BookieId addr, long ledgerId,
                             ForceLedgerCallback cb, Object ctx) {
         executor.executeOrdered(ledgerId,
-                safeRun(() -> {
-                    cb.forceLedgerComplete(BKException.Code.IllegalOpException,
-                            ledgerId, addr, ctx);
-                }));
+                () -> cb.forceLedgerComplete(BKException.Code.IllegalOpException, ledgerId, addr, ctx));
     }
 
     @Override
     public void writeLac(BookieId addr, long ledgerId, byte[] masterKey,
                          long lac, ByteBufList toSend, WriteLacCallback cb, Object ctx) {
         executor.executeOrdered(ledgerId,
-                safeRun(() -> {
-                    cb.writeLacComplete(BKException.Code.IllegalOpException,
-                            ledgerId, addr, ctx);
-                }));
+                () -> cb.writeLacComplete(BKException.Code.IllegalOpException, ledgerId, addr, ctx));
     }
 
     @Override
@@ -198,10 +188,7 @@ public class MockBookieClient implements BookieClient {
     @Override
     public void readLac(BookieId addr, long ledgerId, ReadLacCallback cb, Object ctx) {
         executor.executeOrdered(ledgerId,
-                safeRun(() -> {
-                    cb.readLacComplete(BKException.Code.IllegalOpException,
-                            ledgerId, null, null, ctx);
-                }));
+                () -> cb.readLacComplete(BKException.Code.IllegalOpException, ledgerId, null, null, ctx));
     }
 
     @Override
@@ -245,30 +232,24 @@ public class MockBookieClient implements BookieClient {
                                           ReadEntryCallback cb,
                                           Object ctx) {
         executor.executeOrdered(ledgerId,
-                safeRun(() -> {
-                    cb.readEntryComplete(BKException.Code.IllegalOpException,
-                            ledgerId, entryId, null, ctx);
-                }));
+                () -> cb.readEntryComplete(BKException.Code.IllegalOpException, ledgerId, entryId, null, ctx));
     }
 
     @Override
     public void getBookieInfo(BookieId addr, long requested,
                               GetBookieInfoCallback cb, Object ctx) {
         executor.executeOrdered(addr,
-                safeRun(() -> {
-                    cb.getBookieInfoComplete(BKException.Code.IllegalOpException,
-                            null, ctx);
-                }));
+                () -> cb.getBookieInfoComplete(BKException.Code.IllegalOpException, null, ctx));
     }
 
     @Override
     public CompletableFuture<AvailabilityOfEntriesOfLedger> getListOfEntriesOfLedger(BookieId address,
                                                                                      long ledgerId) {
         FutureGetListOfEntriesOfLedger futureResult = new FutureGetListOfEntriesOfLedger(ledgerId);
-        executor.executeOrdered(address, safeRun(() -> {
-            futureResult
-                    .completeExceptionally(BKException.create(BKException.Code.IllegalOpException).fillInStackTrace());
-        }));
+        executor.executeOrdered(address, () ->
+                futureResult.completeExceptionally(
+                        BKException.create(BKException.Code.IllegalOpException).fillInStackTrace())
+        );
         return futureResult;
     }
 

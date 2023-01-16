@@ -19,13 +19,10 @@
 package org.apache.bookkeeper.server.http;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
 import lombok.extern.slf4j.Slf4j;
-
 import org.apache.bookkeeper.bookie.Bookie;
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BookKeeperAdmin;
@@ -43,8 +40,10 @@ import org.apache.bookkeeper.replication.AutoRecoveryMain;
 import org.apache.bookkeeper.server.http.service.AutoRecoveryStatusService;
 import org.apache.bookkeeper.server.http.service.BookieInfoService;
 import org.apache.bookkeeper.server.http.service.BookieIsReadyService;
+import org.apache.bookkeeper.server.http.service.BookieSanityService;
 import org.apache.bookkeeper.server.http.service.BookieStateReadOnlyService;
 import org.apache.bookkeeper.server.http.service.BookieStateService;
+import org.apache.bookkeeper.server.http.service.ClusterInfoService;
 import org.apache.bookkeeper.server.http.service.ConfigurationService;
 import org.apache.bookkeeper.server.http.service.DecommissionService;
 import org.apache.bookkeeper.server.http.service.DeleteLedgerService;
@@ -61,6 +60,8 @@ import org.apache.bookkeeper.server.http.service.LostBookieRecoveryDelayService;
 import org.apache.bookkeeper.server.http.service.MetricsService;
 import org.apache.bookkeeper.server.http.service.ReadLedgerEntryService;
 import org.apache.bookkeeper.server.http.service.RecoveryBookieService;
+import org.apache.bookkeeper.server.http.service.ResumeCompactionService;
+import org.apache.bookkeeper.server.http.service.SuspendCompactionService;
 import org.apache.bookkeeper.server.http.service.TriggerAuditService;
 import org.apache.bookkeeper.server.http.service.TriggerGCService;
 import org.apache.bookkeeper.server.http.service.WhoIsAuditorService;
@@ -220,12 +221,20 @@ public class BKHttpServiceProvider implements HttpServiceProvider {
                 return new GCDetailsService(configuration, bookieServer);
             case BOOKIE_STATE:
                 return new BookieStateService(bookieServer.getBookie());
+            case BOOKIE_SANITY:
+                return new BookieSanityService(configuration);
             case BOOKIE_STATE_READONLY:
                 return new BookieStateReadOnlyService(bookieServer.getBookie());
             case BOOKIE_IS_READY:
                 return new BookieIsReadyService(bookieServer.getBookie());
             case BOOKIE_INFO:
                 return new BookieInfoService(bookieServer.getBookie());
+            case CLUSTER_INFO:
+                return new ClusterInfoService(bka, ledgerManagerFactory);
+            case SUSPEND_GC_COMPACTION:
+                return new SuspendCompactionService(bookieServer);
+            case RESUME_GC_COMPACTION:
+                return new ResumeCompactionService(bookieServer);
 
             // autorecovery
             case AUTORECOVERY_STATUS:

@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,9 +36,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalCause;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
-
 import io.netty.buffer.ByteBuf;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -54,9 +52,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-
 import lombok.extern.slf4j.Slf4j;
-
 import org.apache.bookkeeper.bookie.DefaultEntryLogger.BufferedLogChannel;
 import org.apache.bookkeeper.bookie.LedgerDirsManager.LedgerDirsListener;
 import org.apache.bookkeeper.conf.ServerConfiguration;
@@ -338,8 +334,10 @@ class EntryLogManagerForEntryLogPerLedger extends EntryLogManagerBase {
      */
     private void onCacheEntryRemoval(RemovalNotification<Long, EntryLogAndLockTuple> removedLedgerEntryLogMapEntry) {
         Long ledgerId = removedLedgerEntryLogMapEntry.getKey();
-        log.debug("LedgerId {} is being evicted from the cache map because of {}", ledgerId,
-                removedLedgerEntryLogMapEntry.getCause());
+        if (log.isDebugEnabled()) {
+            log.debug("LedgerId {} is being evicted from the cache map because of {}", ledgerId,
+                    removedLedgerEntryLogMapEntry.getCause());
+        }
         EntryLogAndLockTuple entryLogAndLockTuple = removedLedgerEntryLogMapEntry.getValue();
         if (entryLogAndLockTuple == null) {
             log.error("entryLogAndLockTuple is not supposed to be null in entry removal listener for ledger : {}",

@@ -19,7 +19,6 @@
 package org.apache.bookkeeper.client;
 
 import io.netty.util.concurrent.DefaultThreadFactory;
-
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -31,7 +30,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.bookkeeper.client.AsyncCallback.CreateCallback;
 import org.apache.bookkeeper.client.AsyncCallback.DeleteCallback;
 import org.apache.bookkeeper.client.AsyncCallback.OpenCallback;
@@ -107,9 +105,9 @@ public class MockBookKeeper extends BookKeeper {
                     log.info("Creating ledger {}", id);
                     MockLedgerHandle lh = new MockLedgerHandle(MockBookKeeper.this, id, digestType, passwd);
                     ledgers.put(id, lh);
-                    cb.createComplete(0, lh, ctx);
+                    lh.executeOrdered(() -> cb.createComplete(0, lh, ctx));
                 } catch (Throwable t) {
-                    t.printStackTrace();
+                    log.error("Error", t);
                 }
             }
         });
@@ -164,7 +162,7 @@ public class MockBookKeeper extends BookKeeper {
         } else if (!Arrays.equals(lh.passwd, passwd)) {
             cb.openComplete(BKException.Code.UnauthorizedAccessException, null, ctx);
         } else {
-            cb.openComplete(0, lh, ctx);
+            lh.executeOrdered(() -> cb.openComplete(0, lh, ctx));
         }
     }
 
@@ -271,7 +269,9 @@ public class MockBookKeeper extends BookKeeper {
 
     void checkProgrammedFail() throws BKException {
         int steps = stepsToFail.getAndDecrement();
-        log.debug("Steps to fail: {}", steps);
+        if (log.isDebugEnabled()) {
+            log.debug("Steps to fail: {}", steps);
+        }
         if (steps <= 0) {
             if (failReturnCode != BKException.Code.OK) {
                 int rc = failReturnCode;
@@ -284,7 +284,9 @@ public class MockBookKeeper extends BookKeeper {
 
     boolean getProgrammedFailStatus() {
         int steps = stepsToFail.getAndDecrement();
-        log.debug("Steps to fail: {}", steps);
+        if (log.isDebugEnabled()) {
+            log.debug("Steps to fail: {}", steps);
+        }
         return steps == 0;
     }
 

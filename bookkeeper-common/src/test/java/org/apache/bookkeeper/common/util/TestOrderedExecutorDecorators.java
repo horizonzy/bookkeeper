@@ -21,7 +21,6 @@
 
 package org.apache.bookkeeper.common.util;
 
-import static org.apache.bookkeeper.common.util.SafeRunnable.safeRun;
 import static org.hamcrest.Matchers.hasItem;
 import static org.junit.Assert.assertThat;
 import static org.mockito.AdditionalAnswers.answerVoid;
@@ -33,7 +32,6 @@ import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.ThreadContext;
 import org.apache.logging.log4j.core.LogEvent;
@@ -42,7 +40,6 @@ import org.apache.logging.log4j.core.appender.NullAppender;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -131,9 +128,7 @@ public class TestOrderedExecutorDecorators {
 
         try {
             ThreadContext.put(MDC_KEY, "testMDCInvokeOrdered");
-            scheduler.scheduleOrdered(10, safeRun(() -> {
-                        log.info("foobar");
-                    }), 0, TimeUnit.DAYS).get();
+            scheduler.scheduleOrdered(10, () -> log.info("foobar"), 0, TimeUnit.DAYS).get();
             assertThat(capturedEvents,
                        hasItem(mdcFormat("testMDCInvokeOrdered", "foobar")));
         } finally {
@@ -148,9 +143,7 @@ public class TestOrderedExecutorDecorators {
 
         try {
             ThreadContext.put(MDC_KEY, "testMDCInvokeOrdered");
-            scheduler.chooseThread(10).schedule(safeRun(() -> {
-                        log.info("foobar");
-                    }), 0, TimeUnit.DAYS).get();
+            scheduler.chooseThread(10).schedule(() -> log.info("foobar"), 0, TimeUnit.DAYS).get();
             assertThat(capturedEvents,
                        hasItem(mdcFormat("testMDCInvokeOrdered", "foobar")));
         } finally {

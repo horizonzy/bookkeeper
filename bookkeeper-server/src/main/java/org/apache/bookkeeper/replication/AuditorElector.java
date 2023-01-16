@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,6 +21,7 @@
 package org.apache.bookkeeper.replication;
 
 import static org.apache.bookkeeper.replication.ReplicationStats.AUDITOR_SCOPE;
+
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
@@ -198,7 +199,9 @@ public class AuditorElector {
         try {
             return executor.submit(r);
         } catch (RejectedExecutionException e) {
-            LOG.debug("Executor was already closed");
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Executor was already closed");
+            }
             return CompletableFuture.completedFuture(null);
         }
     }
@@ -230,16 +233,11 @@ public class AuditorElector {
      * Shutting down AuditorElector.
      */
     public void shutdown() throws InterruptedException {
-        try {
-            ledgerAuditorManager.close();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-
         synchronized (this) {
             if (executor.isShutdown()) {
                 return;
             }
+            // close auditor manager
             submitShutdownTask();
             executor.shutdown();
         }

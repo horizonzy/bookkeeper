@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,7 +31,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.PrimitiveIterator;
 import java.util.Set;
-
 import org.junit.Test;
 
 /**

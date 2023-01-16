@@ -26,7 +26,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -38,7 +37,6 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
-
 import org.apache.bookkeeper.client.BookieInfoReader.BookieInfo;
 import org.apache.bookkeeper.client.WeightedRandomSelection.WeightedObject;
 import org.apache.bookkeeper.net.BookieId;
@@ -54,6 +52,7 @@ import org.apache.bookkeeper.proto.BookieAddressResolver;
 import org.apache.bookkeeper.stats.Counter;
 import org.apache.bookkeeper.stats.OpStatsLogger;
 import org.apache.bookkeeper.stats.annotations.StatsDoc;
+import org.apache.commons.collections4.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -659,8 +658,10 @@ abstract class TopologyAwareEnsemblePlacementPolicy implements
             joinedBookies = Sets.difference(writableBookies, oldBookieSet).immutableCopy();
             // dead bookies.
             deadBookies = Sets.difference(leftBookies, readOnlyBookies).immutableCopy();
-            LOG.debug("Cluster changed : left bookies are {}, joined bookies are {}, while dead bookies are {}.",
-                    leftBookies, joinedBookies, deadBookies);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Cluster changed : left bookies are {}, joined bookies are {}, while dead bookies are {}.",
+                        leftBookies, joinedBookies, deadBookies);
+            }
             handleBookiesThatLeft(leftBookies);
             handleBookiesThatJoined(joinedBookies);
             if (this.isWeighted && (leftBookies.size() > 0 || joinedBookies.size() > 0)) {
@@ -765,6 +766,22 @@ abstract class TopologyAwareEnsemblePlacementPolicy implements
         }
     }
 
+    public static int differBetweenBookies(List<BookieId> bookiesA, List<BookieId> bookiesB) {
+        if (CollectionUtils.isEmpty(bookiesA) || CollectionUtils.isEmpty(bookiesB)) {
+            return Integer.MAX_VALUE;
+        }
+        if (bookiesA.size() != bookiesB.size()) {
+            return Integer.MAX_VALUE;
+        }
+        int differ = 0;
+        for (int i = 0; i < bookiesA.size(); i++) {
+            if (!bookiesA.get(i).equals(bookiesB.get(i))) {
+                differ++;
+            }
+        }
+        return differ;
+    }
+
     @Override
     public void updateBookieInfo(Map<BookieId, BookieInfo> bookieInfoMap) {
         if (!isWeighted) {
@@ -814,15 +831,19 @@ abstract class TopologyAwareEnsemblePlacementPolicy implements
         }
     }
 
-    protected Set<Node> convertBookiesToNodes(Collection<BookieId> excludeBookies) {
+    protected Set<Node> convertBookiesToNodes(Collection<BookieId> bookies) {
         Set<Node> nodes = new HashSet<Node>();
-        for (BookieId addr : excludeBookies) {
-            BookieNode bn = knownBookies.get(addr);
-            if (null == bn) {
-                bn = createBookieNode(addr);
-            }
-            nodes.add(bn);
+        for (BookieId addr : bookies) {
+            nodes.add(convertBookieToNode(addr));
         }
         return nodes;
+    }
+
+    protected BookieNode convertBookieToNode(BookieId addr) {
+        BookieNode bn = knownBookies.get(addr);
+        if (null == bn) {
+            bn = createBookieNode(addr);
+        }
+        return bn;
     }
 }

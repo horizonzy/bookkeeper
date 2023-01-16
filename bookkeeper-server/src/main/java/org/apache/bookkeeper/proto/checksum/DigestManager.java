@@ -22,10 +22,8 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.ReferenceCountUtil;
-
 import java.security.GeneralSecurityException;
 import java.security.NoSuchAlgorithmException;
-
 import org.apache.bookkeeper.client.BKException.BKDigestMatchException;
 import org.apache.bookkeeper.client.LedgerHandle;
 import org.apache.bookkeeper.proto.DataFormats.LedgerMetadataFormat.DigestType;
@@ -117,7 +115,7 @@ public abstract class DigestManager {
         final ByteBuf unwrapped = data.unwrap() != null && data.unwrap() instanceof CompositeByteBuf
                 ? data.unwrap() : data;
         ReferenceCountUtil.retain(unwrapped);
-        ReferenceCountUtil.release(data);
+        ReferenceCountUtil.safeRelease(data);
 
         if (unwrapped instanceof CompositeByteBuf) {
             ((CompositeByteBuf) unwrapped).forEach(this::update);
@@ -184,7 +182,7 @@ public abstract class DigestManager {
                 throw new BKDigestMatchException();
             }
         } finally {
-            digest.release();
+            ReferenceCountUtil.safeRelease(digest);
         }
 
         long actualLedgerId = dataReceived.readLong();
@@ -224,7 +222,7 @@ public abstract class DigestManager {
                 throw new BKDigestMatchException();
             }
         } finally {
-            digest.release();
+            ReferenceCountUtil.safeRelease(digest);
         }
 
         long actualLedgerId = dataReceived.readLong();

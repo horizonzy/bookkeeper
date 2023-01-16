@@ -135,11 +135,11 @@
     <grpc.version>1.47.0</grpc.version>
     <guava.version>31.0.1-jre</guava.version>
     <kerby.version>1.1.1</kerby.version>
-    <hadoop.version>2.10.0</hadoop.version>
+    <hadoop.version>3.2.4</hadoop.version>
     <hamcrest.version>1.3</hamcrest.version>
     <hdrhistogram.version>2.1.10</hdrhistogram.version>
-    <jackson.version>2.13.2.20220328</jackson.version>
-    <jcommander.version>1.78</jcommander.version>
+    <jackson.version>2.13.4.20221013</jackson.version>
+    <jcommander.version>1.82</jcommander.version>
     <jetty.version>9.4.48.v20220622</jetty.version>
     <jmh.version>1.19</jmh.version>
     <jmock.version>2.8.2</jmock.version>
@@ -150,29 +150,30 @@
     <junit5.version>5.8.2</junit5.version>
     <libthrift.version>0.14.2</libthrift.version>
     <lombok.version>1.18.22</lombok.version>
-    <log4j.version>2.17.2</log4j.version>
+    <log4j.version>2.18.0</log4j.version>
     <lz4.version>1.3.0</lz4.version>
     <mockito.version>3.12.4</mockito.version>
-    <netty.version>4.1.77.Final</netty.version>
-    <netty-boringssl.version>2.0.52.Final</netty-boringssl.version>
+    <netty.version>4.1.86.Final</netty.version>
+    <netty-boringssl.version>2.0.54.Final</netty-boringssl.version>
+    <netty-iouring.version>0.0.16.Final</netty-iouring.version>
     <ostrich.version>9.1.3</ostrich.version>
     <powermock.version>2.0.9</powermock.version>
     <prometheus.version>0.15.0</prometheus.version>
     <datasketches.version>0.8.3</datasketches.version>
     <httpclient.version>4.5.13</httpclient.version>
     <httpcore.version>4.4.15</httpcore.version>
-    <protobuf.version>3.19.2</protobuf.version>
-    <protoc3.version>3.19.2</protoc3.version>
+    <protobuf.version>3.19.6</protobuf.version>
+    <protoc3.version>3.19.6</protoc3.version>
     <protoc-gen-grpc-java.version>${grpc.version}</protoc-gen-grpc-java.version>
     <reflections.version>0.9.11</reflections.version>
     <rocksdb.version>6.29.4.1</rocksdb.version>
     <shrinkwrap.version>3.0.1</shrinkwrap.version>
     <slf4j.version>1.7.32</slf4j.version>
-    <snakeyaml.version>1.30</snakeyaml.version>
+    <snakeyaml.version>1.32</snakeyaml.version>
     <spotbugs-annotations.version>4.6.0</spotbugs-annotations.version>
     <javax-annotations-api.version>1.3.2</javax-annotations-api.version>
     <testcontainers.version>1.15.1</testcontainers.version>
-    <vertx.version>3.9.8</vertx.version>
+    <vertx.version>4.3.2</vertx.version>
     <zookeeper.version>3.8.0</zookeeper.version>
     <snappy.version>1.1.7.7</snappy.version>
     <jctools.version>2.1.2</jctools.version>
@@ -189,7 +190,7 @@
     <jacoco-maven-plugin.version>0.8.8</jacoco-maven-plugin.version>
     <maven-antrun-plugin.version>1.8</maven-antrun-plugin.version>
     <maven-assembly-plugin.version>3.1.0</maven-assembly-plugin.version>
-    <maven-checkstyle-plugin.version>3.0.0</maven-checkstyle-plugin.version>
+    <maven-checkstyle-plugin.version>3.1.2</maven-checkstyle-plugin.version>
     <maven-clean-plugin.version>3.2.0</maven-clean-plugin.version>
     <maven-compiler-plugin.version>3.10.1</maven-compiler-plugin.version>
     <maven-dependency-plugin.version>3.0.2</maven-dependency-plugin.version>
@@ -200,11 +201,11 @@
     <maven-shade-plugin.version>3.2.0</maven-shade-plugin.version>
     <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
     <maven-surefire-plugin.version>3.0.0-M5</maven-surefire-plugin.version>
-    <dependency-check-maven.version>7.1.0</dependency-check-maven.version>
+    <dependency-check-maven.version>7.1.2</dependency-check-maven.version>
     <nar-maven-plugin.version>3.10.1</nar-maven-plugin.version>
     <os-maven-plugin.version>1.4.1.Final</os-maven-plugin.version>
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
-    <puppycrawl.checkstyle.version>6.19</puppycrawl.checkstyle.version>
+    <puppycrawl.checkstyle.version>9.3</puppycrawl.checkstyle.version>
     <spotbugs-maven-plugin.version>4.6.0.0</spotbugs-maven-plugin.version>
     <forkCount.variable>1</forkCount.variable>
     <servlet-api.version>4.0.0</servlet-api.version>
@@ -367,6 +368,11 @@
         <artifactId>protobuf-java</artifactId>
         <version>${protobuf.version}</version>
       </dependency>
+      <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-java-util</artifactId>
+        <version>${protobuf.version}</version>
+      </dependency>
 
       <!-- libthrift dependency -->
       <dependency>
@@ -461,6 +467,23 @@
         <groupId>io.netty</groupId>
         <artifactId>netty-tcnative-boringssl-static</artifactId>
         <version>${netty-boringssl.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.netty.incubator</groupId>
+        <artifactId>netty-incubator-transport-native-io_uring</artifactId>
+        <version>${netty-iouring.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.netty.incubator</groupId>
+        <artifactId>netty-incubator-transport-native-io_uring</artifactId>
+        <version>${netty-iouring.version}</version>
+        <classifier>linux-x86_64</classifier>
+      </dependency>
+      <dependency>
+        <groupId>io.netty.incubator</groupId>
+        <artifactId>netty-incubator-transport-native-io_uring</artifactId>
+        <version>${netty-iouring.version}</version>
+        <classifier>linux-aarch_64</classifier>
       </dependency>
 
       <!-- grpc dependencies -->
@@ -1045,10 +1068,10 @@
 
             <!-- logs -->
             <exclude>**/*.log</exclude>
-              
+
             <!-- json files -->
             <exclude>**/*.json</exclude>
-              
+
             <!-- data -->
             <exclude>data/**</exclude>
 

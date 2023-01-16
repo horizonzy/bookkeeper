@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,6 +24,7 @@ package org.apache.bookkeeper.bookie;
 import static org.apache.bookkeeper.bookie.BookKeeperServerStats.JOURNAL_SCOPE;
 import static org.apache.bookkeeper.bookie.BookKeeperServerStats.LD_INDEX_SCOPE;
 import static org.apache.bookkeeper.bookie.BookKeeperServerStats.LD_LEDGER_SCOPE;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
@@ -31,6 +32,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.buffer.UnpooledByteBufAllocator;
+import io.netty.util.ReferenceCountUtil;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -50,6 +52,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.bookkeeper.bookie.BookieException.DiskPartitionDuplicationException;
@@ -77,7 +80,6 @@ import org.apache.bookkeeper.util.MathUtils;
 import org.apache.bookkeeper.util.collections.ConcurrentLongHashMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.mutable.MutableBoolean;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,7 +114,7 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
     private int exitCode = ExitCode.OK;
 
     private final ConcurrentLongHashMap<byte[]> masterKeyCache =
-            ConcurrentLongHashMap.<byte[]>newBuilder().build();
+            ConcurrentLongHashMap.<byte[]>newBuilder().autoShrink(true).build();
 
     protected StateManager stateManager;
 
@@ -170,7 +172,7 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
      * This means that the configuration has stayed the same as the
      * first run and the filesystem structure is up to date.
      */
-    private void checkEnvironment(RegistrationManager registrationManager)
+    private void checkEnvironment()
             throws BookieException, IOException, InterruptedException {
         List<File> allLedgerDirs = new ArrayList<File>(ledgerDirsManager.getAllLedgerDirs().size()
                 + indexDirsManager.getAllLedgerDirs().size());
@@ -374,6 +376,7 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
                 }
             });
         ledgerStorage.setCheckpointer(Checkpointer.NULL);
+        ledgerStorage.setStorageStorageNotificationListener(LedgerStorageNotificationListener.NULL);
         return ledgerStorage;
     }
 
@@ -401,7 +404,7 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
         this.allocator = allocator;
         this.registrationManager = registrationManager;
         stateManager = initializeStateManager();
-        checkEnvironment(registrationManager);
+        checkEnvironment();
 
         // register shutdown handler using trigger mode
         stateManager.setShutdownHandler(exitCode -> triggerBookieShutdown(exitCode));
@@ -425,11 +428,13 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
             }
         }
 
+        JournalAliveListener journalAliveListener =
+                () -> BookieImpl.this.triggerBookieShutdown(ExitCode.BOOKIE_EXCEPTION);
         // instantiate the journals
         journals = Lists.newArrayList();
         for (int i = 0; i < journalDirectories.size(); i++) {
             journals.add(new Journal(i, journalDirectories.get(i),
-                    conf, ledgerDirsManager, statsLogger.scope(JOURNAL_SCOPE), allocator));
+                    conf, ledgerDirsManager, statsLogger.scope(JOURNAL_SCOPE), allocator, journalAliveListener));
         }
 
         this.entryLogPerLedgerEnabled = conf.isEntryLogPerLedgerEnabled();
@@ -474,10 +479,17 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
             syncThread = new SyncThread(conf, getLedgerDirsListener(), ledgerStorage, checkpointSource, statsLogger);
         }
 
+        LedgerStorageNotificationListener storageNotificationListener = new LedgerStorageNotificationListener() {
+            @Override
+            public void ledgerRemovedFromStorage(long ledgerId) {
+                masterKeyCache.remove(ledgerId);
+            }
+        };
+
         ledgerStorage.setStateManager(stateManager);
         ledgerStorage.setCheckpointSource(checkpointSource);
         ledgerStorage.setCheckpointer(syncThread);
-
+        ledgerStorage.setStorageStorageNotificationListener(storageNotificationListener);
         handles = new HandleFactoryImpl(ledgerStorage);
 
         // Expose Stats
@@ -605,7 +617,8 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
         // validate filtered log ids only when we have markedLogId
         if (markedLog.getLogFileId() > 0) {
             if (logs.size() == 0 || logs.get(0) != markedLog.getLogFileId()) {
-                throw new IOException("Recovery log " + markedLog.getLogFileId() + " is missing");
+                String path = journal.getJournalDirectory().getAbsolutePath();
+                throw new IOException("Recovery log " + markedLog.getLogFileId() + " is missing at " + path);
             }
         }
 
@@ -849,12 +862,13 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
     public int shutdown() {
         return shutdown(ExitCode.OK);
     }
-
     // internal shutdown method to let shutdown bookie gracefully
     // when encountering exception
-    synchronized int shutdown(int exitCode) {
+    ReentrantLock lock = new ReentrantLock(true);
+    int shutdown(int exitCode) {
+        lock.lock();
         try {
-            if (isRunning()) { // avoid shutdown twice
+            if (isRunning()) {
                 // the exitCode only set when first shutdown usually due to exception found
                 LOG.info("Shutting down Bookie-{} with exitCode {}",
                          conf.getBookiePort(), exitCode);
@@ -875,7 +889,6 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
                 for (Journal journal : journals) {
                     journal.shutdown();
                 }
-                this.join();
 
                 // Shutdown the EntryLogger which has the GarbageCollector Thread running
                 ledgerStorage.shutdown();
@@ -892,6 +905,7 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
             LOG.error("Got Exception while trying to shutdown Bookie", e);
             throw e;
         } finally {
+            lock.unlock();
             // setting running to false here, so watch thread
             // in bookie server know it only after bookie shut down
             stateManager.close();
@@ -918,6 +932,17 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
         return journals.get(MathUtils.signSafeMod(ledgerId, journals.size()));
     }
 
+    @VisibleForTesting
+    public ByteBuf createMasterKeyEntry(long ledgerId, byte[] masterKey) {
+        // new handle, we should add the key to journal ensure we can rebuild
+        ByteBuf bb = allocator.directBuffer(8 + 8 + 4 + masterKey.length);
+        bb.writeLong(ledgerId);
+        bb.writeLong(METAENTRY_ID_LEDGER_KEY);
+        bb.writeInt(masterKey.length);
+        bb.writeBytes(masterKey);
+        return bb;
+    }
+
     /**
      * Add an entry to a ledger as specified by handle.
      */
@@ -927,7 +952,7 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
         long ledgerId = handle.getLedgerId();
         long entryId = handle.addEntry(entry);
 
-        bookieStats.getWriteBytes().add(entry.readableBytes());
+        bookieStats.getWriteBytes().addCount(entry.readableBytes());
 
         // journal `addEntry` should happen after the entry is added to ledger storage.
         // otherwise the journal entry can potentially be rolled before the ledger is created in ledger storage.
@@ -935,15 +960,13 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
             // Force the load into masterKey cache
             byte[] oldValue = masterKeyCache.putIfAbsent(ledgerId, masterKey);
             if (oldValue == null) {
-                // new handle, we should add the key to journal ensure we can rebuild
-                ByteBuffer bb = ByteBuffer.allocate(8 + 8 + 4 + masterKey.length);
-                bb.putLong(ledgerId);
-                bb.putLong(METAENTRY_ID_LEDGER_KEY);
-                bb.putInt(masterKey.length);
-                bb.put(masterKey);
-                bb.flip();
-
-                getJournal(ledgerId).logAddEntry(bb, false /* ackBeforeSync */, new NopWriteCallback(), null);
+                ByteBuf masterKeyEntry = createMasterKeyEntry(ledgerId, masterKey);
+                try {
+                    getJournal(ledgerId).logAddEntry(
+                            masterKeyEntry, false /* ackBeforeSync */, new NopWriteCallback(), null);
+                } finally {
+                    ReferenceCountUtil.safeRelease(masterKeyEntry);
+                }
             }
         }
 
@@ -989,11 +1012,12 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
                 bookieStats.getAddBytesStats().registerFailedValue(entrySize);
             }
 
-            entry.release();
+            ReferenceCountUtil.safeRelease(entry);
         }
     }
 
-    private ByteBuf createExplicitLACEntry(long ledgerId, ByteBuf explicitLac) {
+    @VisibleForTesting
+    public ByteBuf createExplicitLACEntry(long ledgerId, ByteBuf explicitLac) {
         ByteBuf bb = allocator.directBuffer(8 + 8 + 4 + explicitLac.capacity());
         bb.writeLong(ledgerId);
         bb.writeLong(METAENTRY_ID_LEDGER_EXPLICITLAC);
@@ -1004,6 +1028,7 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
 
     public void setExplicitLac(ByteBuf entry, WriteCallback writeCallback, Object ctx, byte[] masterKey)
             throws IOException, InterruptedException, BookieException {
+        ByteBuf explicitLACEntry = null;
         try {
             long ledgerId = entry.getLong(entry.readerIndex());
             LedgerDescriptor handle = handles.getHandle(ledgerId, masterKey);
@@ -1011,12 +1036,17 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
                 entry.markReaderIndex();
                 handle.setExplicitLac(entry);
                 entry.resetReaderIndex();
-                ByteBuf explicitLACEntry = createExplicitLACEntry(ledgerId, entry);
+                explicitLACEntry = createExplicitLACEntry(ledgerId, entry);
                 getJournal(ledgerId).logAddEntry(explicitLACEntry, false /* ackBeforeSync */, writeCallback, ctx);
             }
         } catch (NoWritableLedgerDirException e) {
             stateManager.transitionToReadOnlyMode();
             throw new IOException(e);
+        } finally {
+            ReferenceCountUtil.safeRelease(entry);
+            if (explicitLACEntry != null) {
+                ReferenceCountUtil.safeRelease(explicitLACEntry);
+            }
         }
     }
 
@@ -1076,7 +1106,7 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
                 bookieStats.getAddBytesStats().registerFailedValue(entrySize);
             }
 
-            entry.release();
+            ReferenceCountUtil.safeRelease(entry);
         }
     }
 
@@ -1106,7 +1136,7 @@ public class BookieImpl extends BookieCriticalThread implements Bookie {
             }
             ByteBuf entry = handle.readEntry(entryId);
             entrySize = entry.readableBytes();
-            bookieStats.getReadBytes().add(entrySize);
+            bookieStats.getReadBytes().addCount(entrySize);
             success = true;
             return entry;
         } finally {

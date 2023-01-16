@@ -24,14 +24,12 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.common.collect.Lists;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
-
 /**
  * Concurrent hash map.
  *
@@ -528,7 +526,7 @@ public class ConcurrentOpenHashMap<K, V> {
             int removedCount = 0;
             try {
                 // Go through all the buckets for this section
-                for (int bucket = 0; bucket < table.length; bucket += 2) {
+                for (int bucket = 0; size > 0 && bucket < table.length; bucket += 2) {
                     K storedKey = (K) table[bucket];
                     V storedValue = (V) table[bucket + 1];
 

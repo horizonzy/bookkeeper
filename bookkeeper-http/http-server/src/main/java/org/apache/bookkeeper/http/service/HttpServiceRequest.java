@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,7 +22,6 @@ package org.apache.bookkeeper.http.service;
 
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.bookkeeper.http.HttpServer;
 
 /**

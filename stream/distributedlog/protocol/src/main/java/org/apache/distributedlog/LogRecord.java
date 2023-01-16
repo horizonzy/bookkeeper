@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.Unpooled;
+import io.netty.util.ReferenceCountUtil;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -225,7 +226,7 @@ public class LogRecord {
 
     void setPayloadBuf(ByteBuf payload, boolean copyData) {
         if (null != this.payload) {
-            this.payload.release();
+            ReferenceCountUtil.safeRelease(this.payload);
         }
         if (copyData) {
             this.payload = Unpooled.copiedBuffer(payload);
@@ -638,7 +639,9 @@ public class LogRecord {
                         recordStream.advance(1);
                     }
                 } catch (EOFException eof) {
-                    LOG.debug("Skip encountered end of file Exception", eof);
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Skip encountered end of file Exception", eof);
+                    }
                     break;
                 }
             }

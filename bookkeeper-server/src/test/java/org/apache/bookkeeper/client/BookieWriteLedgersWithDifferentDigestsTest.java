@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,7 +31,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Random;
-
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
 import org.junit.Before;
@@ -182,10 +181,12 @@ public class BookieWriteLedgersWithDifferentDigestsTest extends
             ByteBuffer origbb = ByteBuffer.wrap(entries.get(index++));
             Integer origEntry = origbb.getInt();
             ByteBuffer result = ByteBuffer.wrap(ls.nextElement().getEntry());
-            LOG.debug("Length of result: " + result.capacity());
-            LOG.debug("Original entry: " + origEntry);
             Integer retrEntry = result.getInt();
-            LOG.debug("Retrieved entry: " + retrEntry);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Length of result: " + result.capacity());
+                LOG.debug("Original entry: " + origEntry);
+                LOG.debug("Retrieved entry: " + retrEntry);
+            }
             assertTrue("Checking entry " + index + " for equality", origEntry
                     .equals(retrEntry));
         }

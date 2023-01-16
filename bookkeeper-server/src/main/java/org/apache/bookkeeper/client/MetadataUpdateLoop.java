@@ -20,16 +20,13 @@
 package org.apache.bookkeeper.client;
 
 import com.google.common.util.concurrent.RateLimiter;
-
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.function.Supplier;
-
 import org.apache.bookkeeper.client.api.LedgerMetadata;
 import org.apache.bookkeeper.meta.LedgerManager;
 import org.apache.bookkeeper.versioning.Version;
 import org.apache.bookkeeper.versioning.Versioned;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,8 +124,10 @@ class MetadataUpdateLoop {
 
     private void writeLoop(Versioned<LedgerMetadata> currentLocal,
                            CompletableFuture<Versioned<LedgerMetadata>> promise) {
-        LOG.debug("{} starting write loop iteration, attempt {}",
-                  logContext, WRITE_LOOP_COUNT_UPDATER.incrementAndGet(this));
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("{} starting write loop iteration, attempt {}",
+                    logContext, WRITE_LOOP_COUNT_UPDATER.incrementAndGet(this));
+        }
         try {
             if (needsTransformation.needsUpdate(currentLocal.getValue())) {
                 LedgerMetadata transformed = transform.transform(currentLocal.getValue());
@@ -140,10 +139,15 @@ class MetadataUpdateLoop {
                     .whenComplete((writtenMetadata, ex) -> {
                             if (ex == null) {
                                 if (updateLocalValue.updateValue(currentLocal, writtenMetadata)) {
-                                    LOG.debug("{} success", logContext);
+                                    if (LOG.isDebugEnabled()) {
+                                        LOG.debug("{} success", logContext);
+                                    }
                                     promise.complete(writtenMetadata);
                                 } else {
-                                    LOG.debug("{} local value changed while we were writing, try again", logContext);
+                                    if (LOG.isDebugEnabled()) {
+                                        LOG.debug("{} local value changed while we were writing, try again",
+                                                logContext);
+                                    }
                                     writeLoop(currentLocalValue.get(), promise);
                                 }
                             } else if (ex instanceof BKException.BKMetadataVersionException) {
@@ -162,7 +166,9 @@ class MetadataUpdateLoop {
                             }
                         });
             } else {
-                LOG.debug("{} Update not needed, completing", logContext);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("{} Update not needed, completing", logContext);
+                }
                 promise.complete(currentLocal);
             }
         } catch (Exception e) {

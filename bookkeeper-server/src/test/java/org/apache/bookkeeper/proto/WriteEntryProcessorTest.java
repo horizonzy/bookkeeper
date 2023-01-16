@@ -37,7 +37,6 @@ import io.netty.channel.ChannelPromise;
 import io.netty.channel.DefaultChannelPromise;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
-
 import org.apache.bookkeeper.bookie.Bookie;
 import org.apache.bookkeeper.bookie.BookieException;
 import org.apache.bookkeeper.proto.BookieProtocol.ParsedAddRequest;
@@ -67,6 +66,7 @@ public class WriteEntryProcessorTest {
             new byte[0],
             Unpooled.wrappedBuffer("test-entry-data".getBytes(UTF_8)));
         channel = mock(Channel.class);
+        when(channel.isOpen()).thenReturn(true);
         bookie = mock(Bookie.class);
         requestProcessor = mock(BookieRequestProcessor.class);
         when(requestProcessor.getBookie()).thenReturn(bookie);
@@ -100,7 +100,9 @@ public class WriteEntryProcessorTest {
     @Test
     public void testNoneHighPriorityWritesOnReadOnlyBookie() throws Exception {
         when(bookie.isReadOnly()).thenReturn(true);
-        when(channel.voidPromise()).thenReturn(mock(ChannelPromise.class));
+        ChannelPromise mockPromise = mock(ChannelPromise.class);
+        when(channel.newPromise()).thenReturn(mockPromise);
+        when(mockPromise.addListener(any())).thenReturn(mockPromise);
 
         AtomicReference<Object> writtenObject = new AtomicReference<>();
         CountDownLatch latch = new CountDownLatch(1);
@@ -130,7 +132,9 @@ public class WriteEntryProcessorTest {
 
         when(bookie.isReadOnly()).thenReturn(true);
         when(bookie.isAvailableForHighPriorityWrites()).thenReturn(false);
-        when(channel.voidPromise()).thenReturn(mock(ChannelPromise.class));
+        ChannelPromise mockPromise = mock(ChannelPromise.class);
+        when(channel.newPromise()).thenReturn(mockPromise);
+        when(mockPromise.addListener(any())).thenReturn(mockPromise);
 
         AtomicReference<Object> writtenObject = new AtomicReference<>();
         CountDownLatch latch = new CountDownLatch(1);
@@ -160,7 +164,9 @@ public class WriteEntryProcessorTest {
 
         when(bookie.isReadOnly()).thenReturn(true);
         when(bookie.isAvailableForHighPriorityWrites()).thenReturn(true);
-        when(channel.voidPromise()).thenReturn(mock(ChannelPromise.class));
+        ChannelPromise mockPromise = mock(ChannelPromise.class);
+        when(channel.newPromise()).thenReturn(mockPromise);
+        when(mockPromise.addListener(any())).thenReturn(mockPromise);
         doAnswer(invocationOnMock -> {
             processor.writeComplete(0, request.ledgerId, request.entryId, null, null);
             return null;
@@ -193,7 +199,9 @@ public class WriteEntryProcessorTest {
     @Test
     public void testNormalWritesOnWritableBookie() throws Exception {
         when(bookie.isReadOnly()).thenReturn(false);
-        when(channel.voidPromise()).thenReturn(mock(ChannelPromise.class));
+        ChannelPromise mockPromise = mock(ChannelPromise.class);
+        when(channel.newPromise()).thenReturn(mockPromise);
+        when(mockPromise.addListener(any())).thenReturn(mockPromise);
         doAnswer(invocationOnMock -> {
             processor.writeComplete(0, request.ledgerId, request.entryId, null, null);
             return null;
@@ -226,7 +234,9 @@ public class WriteEntryProcessorTest {
     @Test
     public void testWritesCacheFlushTimeout() throws Exception {
         when(bookie.isReadOnly()).thenReturn(false);
-        when(channel.voidPromise()).thenReturn(mock(ChannelPromise.class));
+        ChannelPromise mockPromise = mock(ChannelPromise.class);
+        when(channel.newPromise()).thenReturn(mockPromise);
+        when(mockPromise.addListener(any())).thenReturn(mockPromise);
         when(channel.writeAndFlush(any())).thenReturn(mock(ChannelPromise.class));
         doAnswer(invocationOnMock -> {
             throw new BookieException.OperationRejectedException();

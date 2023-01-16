@@ -19,6 +19,7 @@
 package org.apache.bookkeeper.bookie;
 
 import static org.apache.bookkeeper.meta.MetadataDrivers.runFunctionWithLedgerManagerFactory;
+
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
@@ -159,7 +160,7 @@ public class BookieShell implements Tool {
     static final String CMD_REBUILD_DB_LEDGERS_INDEX = "rebuild-db-ledgers-index";
     static final String CMD_CHECK_DB_LEDGERS_INDEX = "check-db-ledgers-index";
     static final String CMD_REGENERATE_INTERLEAVED_STORAGE_INDEX_FILE = "regenerate-interleaved-storage-index-file";
-    static final String CMD_QUERY_AUTORECOVERY_STATUS = "queryrecoverystatus";
+    static final String CMD_QUERY_AUTORECOVERY_STATUS = "queryautorecoverystatus";
 
     // cookie commands
     static final String CMD_CREATE_COOKIE = "cookie_create";
@@ -2396,46 +2397,56 @@ public class BookieShell implements Tool {
         }
     }
 
-    public static void main(String[] argv) throws Exception {
-        BookieShell shell = new BookieShell();
+    public static void main(String[] argv) {
+        int res = -1;
+        try {
+            BookieShell shell = new BookieShell();
 
-        // handle some common options for multiple cmds
-        Options opts = new Options();
-        opts.addOption(CONF_OPT, true, "configuration file");
-        opts.addOption(LEDGERID_FORMATTER_OPT, true, "format of ledgerId");
-        opts.addOption(ENTRY_FORMATTER_OPT, true, "format of entries");
-        BasicParser parser = new BasicParser();
-        CommandLine cmdLine = parser.parse(opts, argv, true);
+            // handle some common options for multiple cmds
+            Options opts = new Options();
+            opts.addOption(CONF_OPT, true, "configuration file");
+            opts.addOption(LEDGERID_FORMATTER_OPT, true, "format of ledgerId");
+            opts.addOption(ENTRY_FORMATTER_OPT, true, "format of entries");
+            BasicParser parser = new BasicParser();
+            CommandLine cmdLine = parser.parse(opts, argv, true);
 
-        // load configuration
-        CompositeConfiguration conf = new CompositeConfiguration();
-        if (cmdLine.hasOption(CONF_OPT)) {
-            String val = cmdLine.getOptionValue(CONF_OPT);
-            conf.addConfiguration(new PropertiesConfiguration(
-                    new File(val).toURI().toURL()));
+            // load configuration
+            CompositeConfiguration conf = new CompositeConfiguration();
+            if (cmdLine.hasOption(CONF_OPT)) {
+                String val = cmdLine.getOptionValue(CONF_OPT);
+                conf.addConfiguration(new PropertiesConfiguration(
+                        new File(val).toURI().toURL()));
+            }
+            shell.setConf(conf);
+
+            // ledgerid format
+            if (cmdLine.hasOption(LEDGERID_FORMATTER_OPT)) {
+                String val = cmdLine.getOptionValue(LEDGERID_FORMATTER_OPT);
+                shell.ledgerIdFormatter = LedgerIdFormatter.newLedgerIdFormatter(val, shell.bkConf);
+            } else {
+                shell.ledgerIdFormatter = LedgerIdFormatter.newLedgerIdFormatter(shell.bkConf);
+            }
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Using ledgerIdFormatter {}", shell.ledgerIdFormatter.getClass());
+            }
+
+            // entry format
+            if (cmdLine.hasOption(ENTRY_FORMATTER_OPT)) {
+                String val = cmdLine.getOptionValue(ENTRY_FORMATTER_OPT);
+                shell.entryFormatter = EntryFormatter.newEntryFormatter(val, shell.bkConf);
+            } else {
+                shell.entryFormatter = EntryFormatter.newEntryFormatter(shell.bkConf);
+            }
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Using entry formatter {}", shell.entryFormatter.getClass());
+            }
+
+            res = shell.run(cmdLine.getArgs());
+        } catch (Throwable e) {
+            LOG.error("Got an exception", e);
+        } finally {
+            System.exit(res);
         }
-        shell.setConf(conf);
-
-        // ledgerid format
-        if (cmdLine.hasOption(LEDGERID_FORMATTER_OPT)) {
-            String val = cmdLine.getOptionValue(LEDGERID_FORMATTER_OPT);
-            shell.ledgerIdFormatter = LedgerIdFormatter.newLedgerIdFormatter(val, shell.bkConf);
-        } else {
-            shell.ledgerIdFormatter = LedgerIdFormatter.newLedgerIdFormatter(shell.bkConf);
-        }
-        LOG.debug("Using ledgerIdFormatter {}", shell.ledgerIdFormatter.getClass());
-
-        // entry format
-        if (cmdLine.hasOption(ENTRY_FORMATTER_OPT)) {
-            String val = cmdLine.getOptionValue(ENTRY_FORMATTER_OPT);
-            shell.entryFormatter = EntryFormatter.newEntryFormatter(val, shell.bkConf);
-        } else {
-            shell.entryFormatter = EntryFormatter.newEntryFormatter(shell.bkConf);
-        }
-        LOG.debug("Using entry formatter {}", shell.entryFormatter.getClass());
-
-        int res = shell.run(cmdLine.getArgs());
-        System.exit(res);
     }
 
     private synchronized void initEntryLogger() throws IOException {

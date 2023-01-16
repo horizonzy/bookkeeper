@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,12 +21,13 @@
 package org.apache.bookkeeper.bookie.storage.ldb;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.stats.NullStatsLogger;
+import org.apache.bookkeeper.test.TestStatsProvider;
 import org.junit.Test;
 
 /**
@@ -74,6 +75,70 @@ public class EntryLocationIndexTest {
         assertEquals(0, idx.getLocation(40313, 10));
         assertEquals(0, idx.getLocation(40313, 11));
         assertEquals(0, idx.getLocation(40313, 12));
+
+        idx.close();
+    }
+
+    @Test
+    public void deleteBatchLedgersTest() throws Exception {
+        File tmpDir = File.createTempFile("bkTest", ".dir");
+        tmpDir.delete();
+        tmpDir.mkdir();
+        tmpDir.deleteOnExit();
+
+        EntryLocationIndex idx = new EntryLocationIndex(serverConfiguration, KeyValueStorageRocksDB.factory,
+                tmpDir.getAbsolutePath(), NullStatsLogger.INSTANCE);
+
+        int numLedgers = 1000;
+        int numEntriesPerLedger = 100;
+
+        int location = 0;
+        KeyValueStorage.Batch batch = idx.newBatch();
+        for (int entryId = 0; entryId < numEntriesPerLedger; ++entryId) {
+            for (int ledgerId = 0; ledgerId < numLedgers; ++ledgerId) {
+                idx.addLocation(batch, ledgerId, entryId, location);
+                location++;
+            }
+        }
+        batch.flush();
+        batch.close();
+
+
+        int expectedLocation = 0;
+        for (int entryId = 0; entryId < numEntriesPerLedger; ++entryId) {
+            for (int ledgerId = 0; ledgerId < numLedgers; ++ledgerId) {
+                assertEquals(expectedLocation, idx.getLocation(ledgerId, entryId));
+                expectedLocation++;
+            }
+        }
+
+        for (int ledgerId = 0; ledgerId < numLedgers; ++ledgerId) {
+            if (ledgerId % 2 == 0) {
+                idx.delete(ledgerId);
+            }
+        }
+
+        expectedLocation = 0;
+        for (int entryId = 0; entryId < numEntriesPerLedger; ++entryId) {
+            for (int ledgerId = 0; ledgerId < numLedgers; ++ledgerId) {
+                assertEquals(expectedLocation, idx.getLocation(ledgerId, entryId));
+                expectedLocation++;
+            }
+        }
+
+        idx.removeOffsetFromDeletedLedgers();
+
+        expectedLocation = 0;
+        for (int entryId = 0; entryId < numEntriesPerLedger; ++entryId) {
+            for (int ledgerId = 0; ledgerId < numLedgers; ++ledgerId) {
+                if (ledgerId % 2 == 0) {
+                    assertEquals(0, idx.getLocation(ledgerId, entryId));
+                } else {
+                    assertEquals(expectedLocation, idx.getLocation(ledgerId, entryId));
+                }
+                expectedLocation++;
+            }
+        }
 
         idx.close();
     }
@@ -139,5 +204,32 @@ public class EntryLocationIndexTest {
         idx.delete(40313);
         idx.removeOffsetFromDeletedLedgers();
         assertEquals(0, idx.getLocation(40312, 10));
+    }
+
+    @Test
+    public void testEntryIndexLookupLatencyStats() throws IOException {
+        File tmpDir = File.createTempFile("bkTest", ".dir");
+        tmpDir.delete();
+        tmpDir.mkdir();
+        tmpDir.deleteOnExit();
+
+        TestStatsProvider statsProvider = new TestStatsProvider();
+        EntryLocationIndex idx = new EntryLocationIndex(serverConfiguration, KeyValueStorageRocksDB.factory,
+                tmpDir.getAbsolutePath(), statsProvider.getStatsLogger("scope"));
+
+        // Add some dummy indexes
+        idx.addLocation(40313, 11, 5);
+
+        // successful lookup
+        assertEquals(5, idx.getLocation(40313, 11));
+        TestStatsProvider.TestOpStatsLogger lookupEntryLocationOpStats =
+                statsProvider.getOpStatsLogger("scope.lookup-entry-location");
+        assertEquals(1, lookupEntryLocationOpStats.getSuccessCount());
+        assertTrue(lookupEntryLocationOpStats.getSuccessAverage() > 0);
+
+        // failed lookup
+        assertEquals(0, idx.getLocation(12345, 1));
+        assertEquals(1, lookupEntryLocationOpStats.getFailureCount());
+        assertEquals(1, lookupEntryLocationOpStats.getSuccessCount());
     }
 }

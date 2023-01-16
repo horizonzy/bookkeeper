@@ -24,14 +24,11 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.instanceOf;
 
 import com.google.common.collect.Lists;
-
 import io.reactivex.rxjava3.schedulers.Schedulers;
-
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.LedgerMetadataBuilder;
 import org.apache.bookkeeper.client.api.DigestType;
@@ -41,7 +38,6 @@ import org.apache.bookkeeper.meta.LedgerManager;
 import org.apache.bookkeeper.meta.MockLedgerManager;
 import org.apache.bookkeeper.net.BookieId;
 import org.apache.bookkeeper.versioning.Versioned;
-
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -80,11 +76,15 @@ public class MetadataAsyncIteratorTest {
     private static CompletableFuture<Void> removeFromMap(
             ConcurrentHashMap<Long, LedgerMetadata> map,
             long ledgerId, LedgerMetadata metadata) {
-        log.debug("removing ledger {}", ledgerId);
+        if (log.isDebugEnabled()) {
+            log.debug("removing ledger {}", ledgerId);
+        }
         if (map.remove(ledgerId, metadata)) {
             return CompletableFuture.completedFuture(null);
         } else {
-            log.debug("ledger {} already removed", ledgerId);
+            if (log.isDebugEnabled()) {
+                log.debug("ledger {} already removed", ledgerId);
+            }
             return FutureUtils.exception(new Exception("ledger already removed"));
         }
     }

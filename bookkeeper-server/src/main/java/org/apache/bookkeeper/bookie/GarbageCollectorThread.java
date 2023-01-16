@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,11 +22,11 @@
 package org.apache.bookkeeper.bookie;
 
 import static org.apache.bookkeeper.util.BookKeeperConstants.METADATA_CACHE;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.netty.util.concurrent.DefaultThreadFactory;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -36,9 +36,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-
 import lombok.Getter;
-
 import org.apache.bookkeeper.bookie.BookieException.EntryLogMetadataMapException;
 import org.apache.bookkeeper.bookie.GarbageCollector.GarbageCleaner;
 import org.apache.bookkeeper.bookie.stats.GarbageCollectorStats;
@@ -48,7 +46,6 @@ import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.meta.LedgerManager;
 import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.bookkeeper.util.MathUtils;
-import org.apache.bookkeeper.util.SafeRunnable;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.mutable.MutableLong;
 import org.slf4j.Logger;
@@ -58,7 +55,7 @@ import org.slf4j.LoggerFactory;
  * This is the garbage collector thread that runs in the background to
  * remove any entry log files that no longer contains any active ledger.
  */
-public class GarbageCollectorThread extends SafeRunnable {
+public class GarbageCollectorThread implements Runnable {
     private static final Logger LOG = LoggerFactory.getLogger(GarbageCollectorThread.class);
     private static final int SECOND = 1000;
 
@@ -126,6 +123,8 @@ public class GarbageCollectorThread extends SafeRunnable {
 
     private static final AtomicLong threadNum = new AtomicLong(0);
     final AbstractLogCompactor.Throttler throttler;
+
+    private LedgerStorageNotificationListener storageNotificationListener = LedgerStorageNotificationListener.NULL;
     /**
      * Create a garbage collector thread.
      *
@@ -183,6 +182,7 @@ public class GarbageCollectorThread extends SafeRunnable {
                 }
                 gcStats.getDeletedLedgerCounter().inc();
                 ledgerStorage.deleteLedger(ledgerId);
+                storageNotificationListener.ledgerRemovedFromStorage(ledgerId);
             } catch (IOException e) {
                 LOG.error("Exception when deleting the ledger index file on the Bookie: ", e);
             }
@@ -224,7 +224,7 @@ public class GarbageCollectorThread extends SafeRunnable {
                 throw new IOException("Invalid minor compaction threshold "
                                     + minorCompactionThreshold);
             }
-            if (minorCompactionInterval <= gcWaitTime) {
+            if (minorCompactionInterval < gcWaitTime) {
                 throw new IOException("Too short minor compaction interval : "
                                     + minorCompactionInterval);
             }
@@ -245,7 +245,7 @@ public class GarbageCollectorThread extends SafeRunnable {
                 throw new IOException("Invalid major compaction threshold "
                                     + majorCompactionThreshold);
             }
-            if (majorCompactionInterval <= gcWaitTime) {
+            if (majorCompactionInterval < gcWaitTime) {
                 throw new IOException("Too short major compaction interval : "
                                     + majorCompactionInterval);
             }
@@ -332,6 +332,14 @@ public class GarbageCollectorThread extends SafeRunnable {
         return forceGarbageCollection.get();
     }
 
+    public boolean isMajorGcSuspend() {
+        return suspendMajorCompaction.get();
+    }
+
+    public boolean isMinorGcSuspend() {
+        return suspendMinorCompaction.get();
+    }
+
     public void suspendMajorGC() {
         if (suspendMajorCompaction.compareAndSet(false, true)) {
             LOG.info("Suspend Major Compaction triggered by thread: {}", Thread.currentThread().getName());
@@ -381,7 +389,7 @@ public class GarbageCollectorThread extends SafeRunnable {
     }
 
     @Override
-    public void safeRun() {
+    public void run() {
         boolean force = forceGarbageCollection.get();
         boolean suspendMajor = suspendMajorCompaction.get();
         boolean suspendMinor = suspendMinorCompaction.get();
@@ -491,7 +499,7 @@ public class GarbageCollectorThread extends SafeRunnable {
                     // We can remove this entry log file now.
                     LOG.info("Deleting entryLogId {} as it has no active ledgers!", entryLogId);
                     removeEntryLog(entryLogId);
-                    gcStats.getReclaimedSpaceViaDeletes().add(meta.getTotalSize());
+                    gcStats.getReclaimedSpaceViaDeletes().addCount(meta.getTotalSize());
                 } else if (modified) {
                     // update entryLogMetaMap only when the meta modified.
                     entryLogMetaMap.put(meta.getEntryLogId(), meta);
@@ -609,7 +617,7 @@ public class GarbageCollectorThread extends SafeRunnable {
 
                     long priorRemainingSize = meta.getRemainingSize();
                     compactEntryLog(meta);
-                    gcStats.getReclaimedSpaceViaCompaction().add(meta.getTotalSize() - priorRemainingSize);
+                    gcStats.getReclaimedSpaceViaCompaction().addCount(meta.getTotalSize() - priorRemainingSize);
                     compactedBuckets[bucketIndex]++;
                 });
             }
@@ -772,5 +780,9 @@ public class GarbageCollectorThread extends SafeRunnable {
             .majorCompactionCounter(gcStats.getMajorCompactionCounter().get())
             .minorCompactionCounter(gcStats.getMinorCompactionCounter().get())
             .build();
+    }
+
+    public void setStorageStorageNotificationListener(LedgerStorageNotificationListener storageNotificationListener) {
+        this.storageNotificationListener = storageNotificationListener;
     }
 }

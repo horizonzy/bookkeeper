@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,7 +22,6 @@
 package org.apache.bookkeeper.http.vertx;
 
 import io.vertx.ext.web.RoutingContext;
-
 import org.apache.bookkeeper.http.AbstractHttpHandlerFactory;
 import org.apache.bookkeeper.http.HttpServer;
 import org.apache.bookkeeper.http.HttpServiceProvider;

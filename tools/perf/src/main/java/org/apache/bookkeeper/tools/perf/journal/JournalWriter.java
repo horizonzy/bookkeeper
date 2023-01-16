@@ -17,6 +17,7 @@ package org.apache.bookkeeper.tools.perf.journal;
 import static com.google.common.base.Preconditions.checkArgument;
 import static org.apache.bookkeeper.bookie.BookKeeperServerStats.BOOKIE_SCOPE;
 import static org.apache.bookkeeper.bookie.BookKeeperServerStats.JOURNAL_SCOPE;
+
 import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
@@ -25,6 +26,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
+import io.netty.util.ReferenceCountUtil;
 import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
@@ -388,7 +390,7 @@ public class JournalWriter implements Runnable {
                     buf,
                     false,
                     (rc, ledgerId, entryId, addr, ctx) -> {
-                        buf.release();
+                        ReferenceCountUtil.safeRelease(buf);
                         if (0 == rc) {
                             if (null != semaphore) {
                                 semaphore.release(len);

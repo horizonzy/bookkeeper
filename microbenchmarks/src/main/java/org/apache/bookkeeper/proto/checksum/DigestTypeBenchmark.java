@@ -24,11 +24,9 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
-
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.bookkeeper.proto.DataFormats.LedgerMetadataFormat.DigestType;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -61,8 +59,8 @@ public class DigestTypeBenchmark {
      * BufferType.
      */
     public enum BufferType {
-//        ARRAY_BACKED,
-//        NOT_ARRAY_BACKED,
+        ARRAY_BACKED,
+        NOT_ARRAY_BACKED,
         BYTE_BUF_DEFAULT_ALLOC
     }
 
@@ -70,8 +68,8 @@ public class DigestTypeBenchmark {
      * Digest.
      */
     public enum Digest {
-//        MAC,
-//        CRC32,
+        MAC,
+        CRC32,
         CRC32_C,
     }
 
@@ -139,10 +137,10 @@ public class DigestTypeBenchmark {
 
         public ByteBuf getByteBuff(BufferType bType) {
             switch (bType) {
-//                case ARRAY_BACKED:
-//                    return arrayBackedBuffer;
-//                case NOT_ARRAY_BACKED:
-//                    return notArrayBackedBuffer;
+                case ARRAY_BACKED:
+                    return arrayBackedBuffer;
+                case NOT_ARRAY_BACKED:
+                    return notArrayBackedBuffer;
                 case BYTE_BUF_DEFAULT_ALLOC:
                     return byteBufDefaultAlloc;
                 default:
@@ -152,12 +150,12 @@ public class DigestTypeBenchmark {
 
         public DigestManager getDigestManager(Digest digest) {
             switch (digest) {
-//                case CRC32:
-//                    return crc32;
+                case CRC32:
+                    return crc32;
                 case CRC32_C:
                     return crc32c;
-//                case MAC:
-//                    return mac;
+                case MAC:
+                    return mac;
                 default:
                     throw new IllegalArgumentException("unknown digest " + digest);
             }

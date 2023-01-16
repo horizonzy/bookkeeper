@@ -25,7 +25,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.util.Recycler;
 import io.netty.util.Recycler.Handle;
 import io.netty.util.ReferenceCountUtil;
-
+import io.netty.util.ReferenceCounted;
 import org.apache.bookkeeper.proto.BookkeeperProtocol.AuthMessage;
 import org.apache.bookkeeper.util.ByteBufList;
 
@@ -333,7 +333,7 @@ public interface BookieProtocol {
         }
 
         void release() {
-            data.release();
+            ReferenceCountUtil.safeRelease(data);
         }
 
         private final Handle<ParsedAddRequest> recyclerHandle;
@@ -433,10 +433,8 @@ public interface BookieProtocol {
                                  opCode, ledgerId, entryId, errorCode);
         }
 
-        void retain() {
-        }
-
-        void release() {
+        boolean release() {
+            return true;
         }
 
         void recycle() {
@@ -446,7 +444,7 @@ public interface BookieProtocol {
     /**
      * A request that reads data.
      */
-    class ReadResponse extends Response {
+    class ReadResponse extends Response implements ReferenceCounted {
         final ByteBuf data;
 
         ReadResponse(byte protocolVersion, int errorCode, long ledgerId, long entryId) {
@@ -467,13 +465,41 @@ public interface BookieProtocol {
         }
 
         @Override
-        public void retain() {
-            data.retain();
+        public int refCnt() {
+            return data.refCnt();
         }
 
         @Override
-        public void release() {
-            data.release();
+        public ReferenceCounted retain() {
+            data.retain();
+            return this;
+        }
+
+        @Override
+        public ReferenceCounted retain(int increment) {
+            return data.retain(increment);
+        }
+
+        @Override
+        public ReferenceCounted touch() {
+            data.touch();
+            return this;
+        }
+
+        @Override
+        public ReferenceCounted touch(Object hint) {
+            data.touch(hint);
+            return this;
+        }
+
+        @Override
+        public boolean release() {
+            return data.release();
+        }
+
+        @Override
+        public boolean release(int decrement) {
+            return data.release(decrement);
         }
     }
 

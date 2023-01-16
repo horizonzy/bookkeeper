@@ -24,12 +24,10 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.common.collect.Lists;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.LongFunction;
-
 /**
  * Map from long to an Object.
  *
@@ -533,7 +531,7 @@ public class ConcurrentLongHashMap<V> {
             try {
                 // Go through all the buckets for this section
                 int capacity = this.capacity;
-                for (int bucket = 0; bucket < capacity; bucket++) {
+                for (int bucket = 0; size > 0 && bucket < capacity; bucket++) {
                     long storedKey = keys[bucket];
                     V storedValue = values[bucket];
 

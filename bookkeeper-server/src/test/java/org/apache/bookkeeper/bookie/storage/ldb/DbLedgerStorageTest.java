@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,10 +24,12 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+
 import com.google.common.collect.Lists;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
+import io.netty.util.ReferenceCountUtil;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -48,7 +50,6 @@ import org.apache.bookkeeper.proto.BookieProtocol;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -358,7 +359,7 @@ public class DbLedgerStorageTest {
 
         ByteBuf res = storage.getEntry(1, 2);
         assertEquals(entry2, res);
-        res.release();
+        ReferenceCountUtil.safeRelease(res);
 
         storage.flush();
 
@@ -371,7 +372,7 @@ public class DbLedgerStorageTest {
 
         res = storage.getEntry(1, 2);
         assertEquals(entry2, res);
-        res.release();
+        ReferenceCountUtil.safeRelease(res);
 
         ByteBuf entry1 = Unpooled.buffer(1024);
         entry1.writeLong(1); // ledger id
@@ -382,21 +383,21 @@ public class DbLedgerStorageTest {
 
         res = storage.getEntry(1, 1);
         assertEquals(entry1, res);
-        res.release();
+        ReferenceCountUtil.safeRelease(res);
 
         res = storage.getEntry(1, 2);
         assertEquals(entry2, res);
-        res.release();
+        ReferenceCountUtil.safeRelease(res);
 
         storage.flush();
 
         res = storage.getEntry(1, 1);
         assertEquals(entry1, res);
-        res.release();
+        ReferenceCountUtil.safeRelease(res);
 
         res = storage.getEntry(1, 2);
         assertEquals(entry2, res);
-        res.release();
+        ReferenceCountUtil.safeRelease(res);
     }
 
     @Test

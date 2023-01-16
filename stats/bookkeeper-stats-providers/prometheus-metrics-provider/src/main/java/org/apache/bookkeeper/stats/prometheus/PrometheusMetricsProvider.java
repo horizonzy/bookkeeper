@@ -16,12 +16,10 @@
  */
 package org.apache.bookkeeper.stats.prometheus;
 
+// CHECKSTYLE.OFF: IllegalImport
 import com.google.common.annotations.VisibleForTesting;
-
 import io.netty.util.concurrent.DefaultThreadFactory;
-//CHECKSTYLE.OFF: IllegalImport
 import io.netty.util.internal.PlatformDependent;
-//CHECKSTYLE.ON: IllegalImport
 import io.prometheus.client.Collector;
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.Gauge;
@@ -30,19 +28,22 @@ import io.prometheus.client.hotspot.GarbageCollectorExports;
 import io.prometheus.client.hotspot.MemoryPoolsExports;
 import io.prometheus.client.hotspot.StandardExports;
 import io.prometheus.client.hotspot.ThreadExports;
-
 import java.io.IOException;
 import java.io.Writer;
+import java.lang.management.BufferPoolMXBean;
+import java.lang.management.ManagementFactory;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-
+import java.util.function.Supplier;
 import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.bookkeeper.stats.StatsProvider;
 import org.apache.bookkeeper.stats.ThreadRegistry;
@@ -53,6 +54,7 @@ import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+// CHECKSTYLE.ON: IllegalImport
 
 /**
  * A <i>Prometheus</i> based {@link StatsProvider} implementation.
@@ -100,6 +102,7 @@ public class PrometheusMetricsProvider implements StatsProvider {
     public void start(Configuration conf) {
         boolean httpEnabled = conf.getBoolean(PROMETHEUS_STATS_HTTP_ENABLE, DEFAULT_PROMETHEUS_STATS_HTTP_ENABLE);
         boolean bkHttpServerEnabled = conf.getBoolean("httpServerEnabled", false);
+        boolean exposeDefaultJVMMetrics = conf.getBoolean("exposeDefaultJVMMetrics", true);
         // only start its own http server when prometheus http is enabled and bk http server is not enabled.
         if (httpEnabled && !bkHttpServerEnabled) {
             String httpAddr = conf.getString(PROMETHEUS_STATS_HTTP_ADDRESS, DEFAULT_PROMETHEUS_STATS_HTTP_ADDR);
@@ -120,26 +123,28 @@ public class PrometheusMetricsProvider implements StatsProvider {
             }
         }
 
-        // Include standard JVM stats
-        registerMetrics(new StandardExports());
-        registerMetrics(new MemoryPoolsExports());
-        registerMetrics(new GarbageCollectorExports());
-        registerMetrics(new ThreadExports());
+        if (exposeDefaultJVMMetrics) {
+            // Include standard JVM stats
+            registerMetrics(new StandardExports());
+            registerMetrics(new MemoryPoolsExports());
+            registerMetrics(new GarbageCollectorExports());
+            registerMetrics(new ThreadExports());
 
         // Add direct memory allocated through unsafe
-        registerMetrics(Gauge.build("jvm_memory_direct_bytes_used", "-").create().setChild(new Child() {
-            @Override
-            public double get() {
-                return directMemoryUsage != null ? directMemoryUsage.longValue() : Double.NaN;
-            }
-        }));
+            registerMetrics(Gauge.build("jvm_memory_direct_bytes_used", "-").create().setChild(new Child() {
+                @Override
+                public double get() {
+                    return getDirectMemoryUsage.get();
+                }
+            }));
 
-        registerMetrics(Gauge.build("jvm_memory_direct_bytes_max", "-").create().setChild(new Child() {
-            @Override
-            public double get() {
-                return PlatformDependent.estimateMaxDirectMemory();
-            }
-        }));
+            registerMetrics(Gauge.build("jvm_memory_direct_bytes_max", "-").create().setChild(new Child() {
+                @Override
+                public double get() {
+                    return PlatformDependent.estimateMaxDirectMemory();
+                }
+            }));
+        }
 
         executor = Executors.newSingleThreadScheduledExecutor(new DefaultThreadFactory("metrics"));
 
@@ -212,24 +217,34 @@ public class PrometheusMetricsProvider implements StatsProvider {
         }
     }
 
-
     private static final Logger log = LoggerFactory.getLogger(PrometheusMetricsProvider.class);
 
     /*
      * Try to get Netty counter of used direct memory. This will be correct, unlike the JVM values.
      */
     private static final AtomicLong directMemoryUsage;
+    private static final Optional<BufferPoolMXBean> poolMxBeanOp;
+    private static final Supplier<Double> getDirectMemoryUsage;
+
     static {
-        AtomicLong tmpDirectMemoryUsage = null;
-
-        try {
-            Field field = PlatformDependent.class.getDeclaredField("DIRECT_MEMORY_COUNTER");
-            field.setAccessible(true);
-            tmpDirectMemoryUsage = (AtomicLong) field.get(null);
-        } catch (Throwable t) {
-            log.warn("Failed to access netty DIRECT_MEMORY_COUNTER field {}", t.getMessage());
+        if (PlatformDependent.useDirectBufferNoCleaner()) {
+            poolMxBeanOp = Optional.empty();
+            AtomicLong tmpDirectMemoryUsage = null;
+            try {
+                Field field = PlatformDependent.class.getDeclaredField("DIRECT_MEMORY_COUNTER");
+                field.setAccessible(true);
+                tmpDirectMemoryUsage = (AtomicLong) field.get(null);
+            } catch (Throwable t) {
+                log.warn("Failed to access netty DIRECT_MEMORY_COUNTER field {}", t.getMessage());
+            }
+            directMemoryUsage = tmpDirectMemoryUsage;
+            getDirectMemoryUsage = () -> directMemoryUsage != null ? directMemoryUsage.get() : Double.NaN;
+        } else {
+            directMemoryUsage = null;
+            List<BufferPoolMXBean> platformMXBeans = ManagementFactory.getPlatformMXBeans(BufferPoolMXBean.class);
+            poolMxBeanOp = platformMXBeans.stream()
+                    .filter(bufferPoolMXBean -> bufferPoolMXBean.getName().equals("direct")).findAny();
+            getDirectMemoryUsage = () -> poolMxBeanOp.isPresent() ? poolMxBeanOp.get().getMemoryUsed() : Double.NaN;
         }
-
-        directMemoryUsage = tmpDirectMemoryUsage;
     }
 }

@@ -18,7 +18,6 @@
 package org.apache.bookkeeper.client;
 
 import com.google.common.annotations.VisibleForTesting;
-
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.bookkeeper.client.AsyncCallback.AddCallback;
@@ -130,6 +129,8 @@ class LedgerRecoveryOp implements ReadEntryListener, AddCallback {
                             // ledger recovery
                             metadataForRecovery = lh.getLedgerMetadata();
                             doRecoveryRead();
+                        } else if (rc == BKException.Code.TimeoutException) {
+                            submitCallback(rc);
                         } else if (rc == BKException.Code.UnauthorizedAccessException) {
                             submitCallback(rc);
                         } else {

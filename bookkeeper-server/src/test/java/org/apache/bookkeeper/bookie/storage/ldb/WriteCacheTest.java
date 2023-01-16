@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,7 +30,7 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.buffer.UnpooledByteBufAllocator;
-
+import io.netty.util.ReferenceCountUtil;
 import java.nio.charset.Charset;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
@@ -39,7 +39,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.junit.Test;
 
 /**
@@ -80,7 +79,7 @@ public class WriteCacheTest {
         assertEquals(0, cache.count());
         assertEquals(0, cache.size());
 
-        entry1.release();
+        ReferenceCountUtil.safeRelease(entry1);
         cache.close();
     }
 
@@ -121,7 +120,7 @@ public class WriteCacheTest {
 
         assertEquals(0, findCount.get());
 
-        entry.release();
+        ReferenceCountUtil.safeRelease(entry);
         cache.close();
     }
 

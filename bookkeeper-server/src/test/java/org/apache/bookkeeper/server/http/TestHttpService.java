@@ -27,15 +27,12 @@ import static org.junit.Assert.assertTrue;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.UncheckedExecutionException;
-
 import java.io.File;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Future;
-
 import lombok.Cleanup;
-
 import org.apache.bookkeeper.bookie.BookieResources;
 import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.bookkeeper.client.ClientUtil;
@@ -55,8 +52,11 @@ import org.apache.bookkeeper.meta.MetadataBookieDriver;
 import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.replication.AuditorElector;
 import org.apache.bookkeeper.server.http.service.BookieInfoService;
+import org.apache.bookkeeper.server.http.service.BookieSanityService;
+import org.apache.bookkeeper.server.http.service.BookieSanityService.BookieSanity;
 import org.apache.bookkeeper.server.http.service.BookieStateReadOnlyService.ReadOnlyState;
 import org.apache.bookkeeper.server.http.service.BookieStateService.BookieState;
+import org.apache.bookkeeper.server.http.service.ClusterInfoService;
 import org.apache.bookkeeper.stats.NullStatsLogger;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
 import org.junit.Before;
@@ -857,6 +857,27 @@ public class TestHttpService extends BookKeeperClusterTestCase {
     }
 
     @Test
+    public void testGetBookieSanity() throws Exception {
+        HttpEndpointService bookieStateServer = bkHttpServiceProvider
+                .provideHttpEndpointService(HttpServer.ApiType.BOOKIE_SANITY);
+
+        HttpServiceRequest request1 = new HttpServiceRequest(null, HttpServer.Method.GET, null);
+        ServerConfiguration conf = servers.get(0).getConfiguration();
+        BookieSanityService service = new BookieSanityService(conf);
+        HttpServiceResponse response1 = service.handle(request1);
+        assertEquals(HttpServer.StatusCode.OK.getValue(), response1.getStatusCode());
+        // run multiple iteration to validate any server side throttling doesn't
+        // fail sequential requests.
+        for (int i = 0; i < 3; i++) {
+            BookieSanity bs = JsonUtil.fromJson(response1.getBody(), BookieSanity.class);
+            assertEquals(true, bs.isPassed());
+            assertEquals(false, bs.isReadOnly());
+        }
+        HttpServiceResponse response2 = bookieStateServer.handle(request1);
+        assertEquals(HttpServer.StatusCode.OK.getValue(), response2.getStatusCode());
+    }
+
+    @Test
     public void testGetBookieIsReady() throws Exception {
         HttpEndpointService bookieStateServer = bkHttpServiceProvider
                 .provideHttpEndpointService(HttpServer.ApiType.BOOKIE_IS_READY);
@@ -897,6 +918,34 @@ public class TestHttpService extends BookKeeperClusterTestCase {
         // Try using POST instead of GET
         HttpServiceRequest request2 = new HttpServiceRequest(null, HttpServer.Method.POST, null);
         HttpServiceResponse response2 = bookieStateServer.handle(request2);
+        assertEquals(HttpServer.StatusCode.NOT_FOUND.getValue(), response2.getStatusCode());
+    }
+
+    @Test
+    public void testGetClusterInfo() throws Exception {
+        HttpEndpointService clusterInfoServer = bkHttpServiceProvider
+                .provideHttpEndpointService(HttpServer.ApiType.CLUSTER_INFO);
+
+        HttpServiceRequest request1 = new HttpServiceRequest(null, HttpServer.Method.GET, null);
+        HttpServiceResponse response1 = clusterInfoServer.handle(request1);
+        assertEquals(HttpServer.StatusCode.OK.getValue(), response1.getStatusCode());
+        LOG.info("Get response: {}", response1.getBody());
+
+        ClusterInfoService.ClusterInfo info = JsonUtil.fromJson(response1.getBody(),
+                ClusterInfoService.ClusterInfo.class);
+        assertFalse(info.isAuditorElected());
+        assertTrue(info.getAuditorId().length() == 0);
+        assertFalse(info.isClusterUnderReplicated());
+        assertTrue(info.isLedgerReplicationEnabled());
+        assertTrue(info.getTotalBookiesCount() > 0);
+        assertTrue(info.getWritableBookiesCount() > 0);
+        assertTrue(info.getReadonlyBookiesCount() == 0);
+        assertTrue(info.getUnavailableBookiesCount() == 0);
+        assertTrue(info.getTotalBookiesCount() == info.getWritableBookiesCount());
+
+        // Try using POST instead of GET
+        HttpServiceRequest request2 = new HttpServiceRequest(null, HttpServer.Method.POST, null);
+        HttpServiceResponse response2 = clusterInfoServer.handle(request2);
         assertEquals(HttpServer.StatusCode.NOT_FOUND.getValue(), response2.getStatusCode());
     }
 
@@ -966,5 +1015,76 @@ public class TestHttpService extends BookKeeperClusterTestCase {
         response = bookieReadOnlyService.handle(request);
         readOnlyState = JsonUtil.fromJson(response.getBody(), ReadOnlyState.class);
         assertFalse(readOnlyState.isReadOnly());
+    }
+
+    @Test
+    public void testSuspendCompaction() throws Exception {
+        HttpEndpointService suspendCompactionService = bkHttpServiceProvider
+                .provideHttpEndpointService(HttpServer.ApiType.SUSPEND_GC_COMPACTION);
+
+        HttpEndpointService resumeCompactionService = bkHttpServiceProvider
+                .provideHttpEndpointService(HttpServer.ApiType.RESUME_GC_COMPACTION);
+
+        //1,  PUT with null body, should return error
+        HttpServiceRequest request1 = new HttpServiceRequest(null, HttpServer.Method.PUT, null);
+        HttpServiceResponse response1 = suspendCompactionService.handle(request1);
+        assertEquals(HttpServer.StatusCode.BAD_REQUEST.getValue(), response1.getStatusCode());
+
+        //2,  PUT with null, should return error, because should contains "suspendMajor" or "suspendMinor"
+        String putBody2 = "{}";
+        HttpServiceRequest request2 = new HttpServiceRequest(putBody2, HttpServer.Method.PUT, null);
+        HttpServiceResponse response2 = suspendCompactionService.handle(request2);
+        assertEquals(HttpServer.StatusCode.BAD_REQUEST.getValue(), response2.getStatusCode());
+
+
+        //3,  GET before suspend, should success
+        HttpServiceRequest request3 = new HttpServiceRequest(null, HttpServer.Method.GET, null);
+        HttpServiceResponse response3 = suspendCompactionService.handle(request3);
+        assertEquals(HttpServer.StatusCode.OK.getValue(), response3.getStatusCode());
+
+        Map responseMap = JsonUtil.fromJson(
+                response3.getBody(),
+                Map.class
+        );
+        assertEquals(responseMap.get("isMajorGcSuspended"), "false");
+        assertEquals(responseMap.get("isMinorGcSuspended"), "false");
+
+
+        //2, PUT, with body, should success
+        String putBody4 = "{\"suspendMajor\": true, \"suspendMinor\": true}";
+        HttpServiceRequest request4 = new HttpServiceRequest(putBody4, HttpServer.Method.PUT, null);
+        HttpServiceResponse response4 = suspendCompactionService.handle(request4);
+        assertEquals(HttpServer.StatusCode.OK.getValue(), response4.getStatusCode());
+
+        //3,  GET after suspend, should success
+        HttpServiceRequest request5 = new HttpServiceRequest(null, HttpServer.Method.GET, null);
+        HttpServiceResponse response5 = suspendCompactionService.handle(request5);
+        assertEquals(HttpServer.StatusCode.OK.getValue(), response5.getStatusCode());
+
+        Map responseMap5 = JsonUtil.fromJson(
+                response5.getBody(),
+                Map.class
+        );
+        assertEquals(responseMap5.get("isMajorGcSuspended"), "true");
+        assertEquals(responseMap5.get("isMinorGcSuspended"), "true");
+
+
+        //2, PUT, with body, should success
+        String putBody6 = "{\"resumeMajor\": true, \"resumeMinor\": true}";
+        HttpServiceRequest request6 = new HttpServiceRequest(putBody6, HttpServer.Method.PUT, null);
+        HttpServiceResponse response6 = resumeCompactionService.handle(request6);
+        assertEquals(HttpServer.StatusCode.OK.getValue(), response6.getStatusCode());
+
+        //3,  GET after suspend, should success
+        HttpServiceRequest request7 = new HttpServiceRequest(null, HttpServer.Method.GET, null);
+        HttpServiceResponse response7 = suspendCompactionService.handle(request7);
+        assertEquals(HttpServer.StatusCode.OK.getValue(), response7.getStatusCode());
+
+        Map responseMap7 = JsonUtil.fromJson(
+                response7.getBody(),
+                Map.class
+        );
+        assertEquals(responseMap7.get("isMajorGcSuspended"), "false");
+        assertEquals(responseMap7.get("isMinorGcSuspended"), "false");
     }
 }

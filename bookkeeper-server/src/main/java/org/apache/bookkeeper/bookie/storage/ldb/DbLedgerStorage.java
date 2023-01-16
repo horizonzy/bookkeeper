@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,17 +22,14 @@ package org.apache.bookkeeper.bookie.storage.ldb;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+// CHECKSTYLE.OFF: IllegalImport
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.util.concurrent.DefaultThreadFactory;
-//CHECKSTYLE.OFF: IllegalImport
 import io.netty.util.internal.PlatformDependent;
-//CHECKSTYLE.ON: IllegalImport
-
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -41,11 +38,8 @@ import java.util.List;
 import java.util.PrimitiveIterator.OfLong;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-
 import org.apache.bookkeeper.bookie.BookieException;
 import org.apache.bookkeeper.bookie.CheckpointSource;
 import org.apache.bookkeeper.bookie.CheckpointSource.Checkpoint;
@@ -56,6 +50,7 @@ import org.apache.bookkeeper.bookie.LastAddConfirmedUpdateNotification;
 import org.apache.bookkeeper.bookie.LedgerCache;
 import org.apache.bookkeeper.bookie.LedgerDirsManager;
 import org.apache.bookkeeper.bookie.LedgerStorage;
+import org.apache.bookkeeper.bookie.LedgerStorageNotificationListener;
 import org.apache.bookkeeper.bookie.StateManager;
 import org.apache.bookkeeper.bookie.storage.EntryLogIdsImpl;
 import org.apache.bookkeeper.bookie.storage.EntryLogger;
@@ -75,6 +70,7 @@ import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.bookkeeper.stats.annotations.StatsDoc;
 import org.apache.bookkeeper.util.DiskChecker;
 import org.apache.commons.lang3.StringUtils;
+// CHECKSTYLE.ON: IllegalImport
 
 
 /**
@@ -90,8 +86,6 @@ public class DbLedgerStorage implements LedgerStorage {
     private int numberOfDirs;
     private List<SingleDirectoryDbLedgerStorage> ledgerStorageList;
 
-    // Keep 1 single Bookie GC thread so the the compactions from multiple individual directories are serialized
-    private ScheduledExecutorService gcExecutor;
     private ExecutorService entryLoggerWriteExecutor = null;
     private ExecutorService entryLoggerFlushExecutor = null;
 
@@ -142,8 +136,6 @@ public class DbLedgerStorage implements LedgerStorage {
         long perDirectoryReadCacheSize = readCacheMaxSize / numberOfDirs;
         int readAheadCacheBatchSize = dbLedgerStorageConf.getReadAheadCacheBatchSize();
 
-        gcExecutor = Executors.newSingleThreadScheduledExecutor(new DefaultThreadFactory("GarbageCollector"));
-
         ledgerStorageList = Lists.newArrayList();
         for (int i = 0; i < ledgerDirsManager.getAllLedgerDirs().size(); i++) {
             File ledgerDir = ledgerDirsManager.getAllLedgerDirs().get(i);
@@ -184,7 +176,7 @@ public class DbLedgerStorage implements LedgerStorage {
                     numReadThreads = conf.getServerNumIOThreads();
                 }
 
-                entrylogger = new DirectEntryLogger(ledgerDir, new EntryLogIdsImpl(ledgerDirsManager, slog),
+                entrylogger = new DirectEntryLogger(ledgerDir, new EntryLogIdsImpl(ldm, slog),
                     new NativeIOImpl(),
                     allocator, entryLoggerWriteExecutor, entryLoggerFlushExecutor,
                     conf.getEntryLogSizeLimit(),
@@ -200,7 +192,7 @@ public class DbLedgerStorage implements LedgerStorage {
             }
             ledgerStorageList.add(newSingleDirectoryDbLedgerStorage(conf, ledgerManager, ldm,
                 idm, entrylogger,
-                statsLogger, gcExecutor, perDirectoryWriteCacheSize,
+                statsLogger, perDirectoryWriteCacheSize,
                 perDirectoryReadCacheSize,
                 readAheadCacheBatchSize));
             ldm.getListeners().forEach(ledgerDirsManager::addLedgerDirsListener);
@@ -240,12 +232,11 @@ public class DbLedgerStorage implements LedgerStorage {
     @VisibleForTesting
     protected SingleDirectoryDbLedgerStorage newSingleDirectoryDbLedgerStorage(ServerConfiguration conf,
             LedgerManager ledgerManager, LedgerDirsManager ledgerDirsManager, LedgerDirsManager indexDirsManager,
-            EntryLogger entryLogger, StatsLogger statsLogger,
-            ScheduledExecutorService gcExecutor, long writeCacheSize, long readCacheSize,
+            EntryLogger entryLogger, StatsLogger statsLogger, long writeCacheSize, long readCacheSize,
             int readAheadCacheBatchSize)
             throws IOException {
         return new SingleDirectoryDbLedgerStorage(conf, ledgerManager, ledgerDirsManager, indexDirsManager, entryLogger,
-                                                  statsLogger, allocator, gcExecutor, writeCacheSize, readCacheSize,
+                                                  statsLogger, allocator, writeCacheSize, readCacheSize,
                                                   readAheadCacheBatchSize);
     }
 
@@ -260,6 +251,11 @@ public class DbLedgerStorage implements LedgerStorage {
     @Override
     public void setCheckpointer(Checkpointer checkpointer) {
         ledgerStorageList.forEach(s -> s.setCheckpointer(checkpointer));
+    }
+
+    @Override
+    public void setStorageStorageNotificationListener(LedgerStorageNotificationListener storageNotificationListener) {
+        ledgerStorageList.forEach(s -> s.setStorageStorageNotificationListener(storageNotificationListener));
     }
 
     @Override
@@ -479,6 +475,36 @@ public class DbLedgerStorage implements LedgerStorage {
     @Override
     public boolean isInForceGC() {
         return ledgerStorageList.stream().anyMatch(SingleDirectoryDbLedgerStorage::isInForceGC);
+    }
+
+    @Override
+    public void suspendMinorGC() {
+        ledgerStorageList.stream().forEach(SingleDirectoryDbLedgerStorage::suspendMinorGC);
+    }
+
+    @Override
+    public void suspendMajorGC() {
+        ledgerStorageList.stream().forEach(SingleDirectoryDbLedgerStorage::suspendMajorGC);
+    }
+
+    @Override
+    public void resumeMinorGC() {
+        ledgerStorageList.stream().forEach(SingleDirectoryDbLedgerStorage::resumeMinorGC);
+    }
+
+    @Override
+    public void resumeMajorGC() {
+        ledgerStorageList.stream().forEach(SingleDirectoryDbLedgerStorage::resumeMajorGC);
+    }
+
+    @Override
+    public boolean isMajorGcSuspended() {
+        return ledgerStorageList.stream().allMatch(SingleDirectoryDbLedgerStorage::isMajorGcSuspended);
+    }
+
+    @Override
+    public boolean isMinorGcSuspended() {
+        return ledgerStorageList.stream().allMatch(SingleDirectoryDbLedgerStorage::isMinorGcSuspended);
     }
 
     @Override

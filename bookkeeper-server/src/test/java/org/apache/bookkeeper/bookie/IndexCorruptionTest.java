@@ -26,7 +26,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Enumeration;
-
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.client.LedgerEntry;
 import org.apache.bookkeeper.client.LedgerHandle;
@@ -53,7 +52,9 @@ public class IndexCorruptionTest extends BookKeeperClusterTestCase {
 
     @Test
     public void testNoSuchLedger() throws Exception {
-        LOG.debug("Testing NoSuchLedger");
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Testing NoSuchLedger");
+        }
 
         SyncThread syncThread = ((BookieImpl) serverByIndex(0).getBookie()).syncThread;
         syncThread.suspendSync();
@@ -94,7 +95,9 @@ public class IndexCorruptionTest extends BookKeeperClusterTestCase {
 
     @Test
     public void testEmptyIndexPage() throws Exception {
-        LOG.debug("Testing EmptyIndexPage");
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Testing EmptyIndexPage");
+        }
 
         SyncThread syncThread = ((BookieImpl) serverByIndex(0).getBookie()).syncThread;
         assertNotNull("Not found SyncThread.", syncThread);

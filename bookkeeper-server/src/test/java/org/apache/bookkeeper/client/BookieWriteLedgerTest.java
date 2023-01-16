@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,6 +28,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+
 import com.google.common.collect.Lists;
 import io.netty.buffer.AbstractByteBufAllocator;
 import io.netty.buffer.ByteBuf;
@@ -731,7 +732,7 @@ public class BookieWriteLedgerTest extends
                         .withDigestType(org.apache.bookkeeper.client.api.DigestType.CRC32)
                         .withPassword(ledgerPassword).makeAdv().withLedgerId(ledgerId)
                         .execute()
-                        .thenApply(writer -> { // Add entries to ledger when created
+                        .thenCompose(writer -> { // Add entries to ledger when created
                                 LOG.info("Writing stream of {} entries to {}",
                                          numEntriesToWrite, ledgerId);
                                 List<ByteBuf> entries = rng.ints(numEntriesToWrite, 0, maxInt)
@@ -750,8 +751,8 @@ public class BookieWriteLedgerTest extends
                                              ledgerId, entryId, entry.slice().readInt());
                                     lastRequest = writer.writeAsync(entryId, entry);
                                 }
-                                lastRequest.join();
-                                return Pair.of(writer, entries);
+                                return lastRequest
+                                        .thenApply(___ -> Pair.of(writer, entries));
                             });
                 })
             .parallel().map(CompletableFuture::join) // wait for all creations and adds in parallel
@@ -814,7 +815,9 @@ public class BookieWriteLedgerTest extends
                 ledgerId %= 9999999999L;
             }
 
-            LOG.debug("Iteration: {}  LedgerId: {}", lc, ledgerId);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Iteration: {}  LedgerId: {}", lc, ledgerId);
+            }
             lh = bkc.createLedgerAdv(ledgerId, 5, 3, 2, digestType, ledgerPassword, null);
             lhArray[lc] = lh;
 
@@ -841,7 +844,9 @@ public class BookieWriteLedgerTest extends
         for (int lc = 0; lc < ledgerCount; lc++) {
             // Read and verify
             long lid = lhArray[lc].getId();
-            LOG.debug("readEntries for lc: {} ledgerId: {} ", lc, lhArray[lc].getId());
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("readEntries for lc: {} ledgerId: {} ", lc, lhArray[lc].getId());
+            }
             readEntriesAndValidateDataArray(lhArray[lc], entryList.get(lc));
             lhArray[lc].close();
             bkc.deleteLedger(lid);
@@ -900,7 +905,9 @@ public class BookieWriteLedgerTest extends
         // wait for all entries to be acknowledged for the first ledger
         synchronized (syncObj1) {
             while (syncObj1.counter < 1) {
-                LOG.debug("Entries counter = " + syncObj1.counter);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Entries counter = " + syncObj1.counter);
+                }
                 syncObj1.wait();
             }
             assertEquals(BKException.Code.OK, syncObj1.rc);
@@ -908,7 +915,9 @@ public class BookieWriteLedgerTest extends
         // wait for all entries to be acknowledged for the second ledger
         synchronized (syncObj2) {
             while (syncObj2.counter < 1) {
-                LOG.debug("Entries counter = " + syncObj2.counter);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Entries counter = " + syncObj2.counter);
+                }
                 syncObj2.wait();
             }
             assertEquals(BKException.Code.OK, syncObj2.rc);
@@ -1442,10 +1451,12 @@ public class BookieWriteLedgerTest extends
             ByteBuffer origbb = ByteBuffer.wrap(entries.get(index++));
             Integer origEntry = origbb.getInt();
             ByteBuffer result = ByteBuffer.wrap(ls.nextElement().getEntry());
-            LOG.debug("Length of result: " + result.capacity());
-            LOG.debug("Original entry: " + origEntry);
             Integer retrEntry = result.getInt();
-            LOG.debug("Retrieved entry: " + retrEntry);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Length of result: " + result.capacity());
+                LOG.debug("Original entry: " + origEntry);
+                LOG.debug("Retrieved entry: " + retrEntry);
+            }
             assertTrue("Checking entry " + index + " for equality", origEntry
                     .equals(retrEntry));
         }
@@ -1472,8 +1483,10 @@ public class BookieWriteLedgerTest extends
         while (ls.hasMoreElements()) {
             byte[] originalData = entries.get(index++);
             byte[] receivedData = ls.nextElement().getEntry();
-            LOG.debug("Length of originalData: {}", originalData.length);
-            LOG.debug("Length of receivedData: {}", receivedData.length);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Length of originalData: {}", originalData.length);
+                LOG.debug("Length of receivedData: {}", receivedData.length);
+            }
             assertEquals(
                     String.format("LedgerID: %d EntryID: %d OriginalDataLength: %d ReceivedDataLength: %d", lh.getId(),
                             (index - 1), originalData.length, receivedData.length),

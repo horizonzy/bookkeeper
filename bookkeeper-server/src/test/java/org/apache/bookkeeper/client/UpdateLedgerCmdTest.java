@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,6 +21,7 @@
 package org.apache.bookkeeper.client;
 
 import static org.junit.Assert.assertEquals;
+
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;

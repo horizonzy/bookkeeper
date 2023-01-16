@@ -21,10 +21,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.bookkeeper.util.BookKeeperConstants.FEATURE_DISABLE_ENSEMBLE_CHANGE;
 
 import io.netty.buffer.ByteBuf;
-
 import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.client.EnsemblePlacementPolicy;
 import org.apache.bookkeeper.client.LedgerHandle;
@@ -162,6 +160,7 @@ public class ClientConfiguration extends AbstractConfiguration<ClientConfigurati
     protected static final String READ_REORDER_THRESHOLD_PENDING_REQUESTS = "readReorderThresholdPendingRequests";
     protected static final String ENSEMBLE_PLACEMENT_POLICY_ORDER_SLOW_BOOKIES =
         "ensemblePlacementPolicyOrderSlowBookies";
+    protected static final String BOOKIE_ADDRESS_RESOLVER_ENABLED = "bookieAddressResolverEnabled";
 
     // Stats
     protected static final String ENABLE_TASK_EXECUTION_STATS = "enableTaskExecutionStats";
@@ -1285,6 +1284,33 @@ public class ClientConfiguration extends AbstractConfiguration<ClientConfigurati
      */
     public ClientConfiguration setEnsemblePlacementPolicySlowBookies(boolean enabled) {
         setProperty(ENSEMBLE_PLACEMENT_POLICY_ORDER_SLOW_BOOKIES, enabled);
+        return this;
+    }
+
+    /**
+     * Whether to enable BookieAddressResolver.
+     *
+     * @return flag to enable/disable BookieAddressResolver.
+     */
+    public boolean getBookieAddressResolverEnabled() {
+        return getBoolean(BOOKIE_ADDRESS_RESOLVER_ENABLED, true);
+    }
+
+    /**
+     * Enable/Disable BookieAddressResolver.
+     *
+     * <p>
+     * If this flag is true, read bookie information from the metadata service (e.g. ZooKeeper) to resolve the address
+     * from each bookie ID. If all bookie IDs in the cluster are "address:port" or "hostname:port", you can set this
+     * flag to false to reduce requests to the metadata service.
+     * </p>
+     *
+     * @param enabled
+     *          flag to enable/disable BookieAddressResolver.
+     * @return client configuration.
+     */
+    public ClientConfiguration setBookieAddressResolverEnabled(boolean enabled) {
+        setProperty(BOOKIE_ADDRESS_RESOLVER_ENABLED, enabled);
         return this;
     }
 

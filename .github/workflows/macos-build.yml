@@ -25,11 +25,10 @@ on:
     branches:
       - master
       - branch-*
-    paths-ignore:
-      - 'site3/**'
 
 jobs:
   test:
+    name: Build with macos on JDK 11
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
@@ -39,11 +38,36 @@ jobs:
       - name: Tune Runner VM
         uses: ./.github/actions/tune-runner-vm
 
+      - name: Detect changed files
+        id: changes
+        uses: apache/pulsar-test-infra/paths-filter@master
+        with:
+          filters: .github/changes-filter.yaml
+          list-files: csv
+
+      - name: Check changed files
+        id: check_changes
+        run: |
+          echo "docs_only=${{ fromJSON(steps.changes.outputs.all_count) == fromJSON(steps.changes.outputs.docs_count) && fromJSON(steps.changes.outputs.docs_count) > 0 }}" >> $GITHUB_OUTPUT
+
+      - name: Cache local Maven repository
+        if: steps.check_changes.outputs.docs_only != 'true'
+        id: cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/bookkeeper
+            !~/.m2/repository/org/apache/distributedlog
+          key: ${{ runner.os }}-bookkeeper-all-${{ hashFiles('**/pom.xml') }}
+
       - name: Set up JDK 11
+        if: steps.check_changes.outputs.docs_only != 'true'
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: 11
 
       - name: mvn package
+        if: steps.check_changes.outputs.docs_only != 'true'
         run: mvn -B -nsu clean package -DskipTests

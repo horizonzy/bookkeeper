@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,7 +24,6 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.google.protobuf.ByteString;
 import io.netty.buffer.ByteBuf;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.AbstractMap.SimpleEntry;
@@ -33,7 +32,6 @@ import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
-
 import org.apache.bookkeeper.bookie.Bookie;
 import org.apache.bookkeeper.bookie.BookieException;
 import org.apache.bookkeeper.bookie.storage.ldb.DbLedgerStorageDataFormats.LedgerData;
@@ -185,10 +183,8 @@ public class LedgerMetadataIndex implements Closeable {
                     log.debug("Re-inserted fenced ledger {}", ledgerId);
                 }
                 ledgersCount.incrementAndGet();
-            } else {
-                if (log.isDebugEnabled()) {
-                    log.debug("Set fenced ledger {}", ledgerId);
-                }
+            } else if (log.isDebugEnabled()) {
+                log.debug("Set fenced ledger {}", ledgerId);
             }
 
             pendingLedgersUpdates.add(new SimpleEntry<Long, LedgerData>(ledgerId, newLedgerData));
@@ -216,10 +212,8 @@ public class LedgerMetadataIndex implements Closeable {
                     log.debug("Re-inserted limbo ledger {}", ledgerId);
                 }
                 ledgersCount.incrementAndGet();
-            } else {
-                if (log.isDebugEnabled()) {
-                    log.debug("Set limbo ledger {}", ledgerId);
-                }
+            } else if (log.isDebugEnabled()) {
+                log.debug("Set limbo ledger {}", ledgerId);
             }
 
             pendingLedgersUpdates.add(new SimpleEntry<Long, LedgerData>(ledgerId, newLedgerData));
@@ -247,10 +241,8 @@ public class LedgerMetadataIndex implements Closeable {
                     log.debug("Re-inserted limbo ledger {}", ledgerId);
                 }
                 ledgersCount.incrementAndGet();
-            } else {
-                if (log.isDebugEnabled()) {
-                    log.debug("Set limbo ledger {}", ledgerId);
-                }
+            } else if (log.isDebugEnabled()) {
+                log.debug("Set limbo ledger {}", ledgerId);
             }
 
             pendingLedgersUpdates.add(new SimpleEntry<Long, LedgerData>(ledgerId, newLedgerData));
@@ -401,10 +393,8 @@ public class LedgerMetadataIndex implements Closeable {
             if (ledgers.put(ledgerId, newLedgerData) == null) {
                 // Ledger had been deleted
                 return;
-            } else {
-                if (log.isDebugEnabled()) {
-                    log.debug("Set explicitLac on ledger {}", ledgerId);
-                }
+            } else if (log.isDebugEnabled()) {
+                log.debug("Set explicitLac on ledger {}", ledgerId);
             }
             pendingLedgersUpdates.add(new SimpleEntry<Long, LedgerData>(ledgerId, newLedgerData));
         } else {

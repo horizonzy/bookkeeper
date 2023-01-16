@@ -24,6 +24,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
+
 import java.io.File;
 import java.io.IOException;
 import java.security.cert.Certificate;
@@ -127,6 +128,7 @@ public class TestTLS extends BookKeeperClusterTestCase {
         baseClientConf.setTLSProviderFactoryClass(TLSContextFactory.class.getName());
         baseClientConf.setTLSClientAuthentication(true);
         baseClientConf.setUseV2WireProtocol(useV2Protocol);
+        baseClientConf.setLimitStatsLogging(false);
 
         switch (clientKeyStoreFormat) {
         case PEM:

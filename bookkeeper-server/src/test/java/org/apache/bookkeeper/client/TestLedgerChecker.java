@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,7 +37,6 @@ import org.apache.bookkeeper.net.BookieId;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
 import org.junit.Test;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -518,7 +517,7 @@ public class TestLedgerChecker extends BookKeeperClusterTestCase {
 
     private Set<LedgerFragment> getUnderReplicatedFragments(LedgerHandle lh)
             throws InterruptedException {
-        LedgerChecker checker = new LedgerChecker(bkc);
+        LedgerChecker checker = new LedgerChecker(bkc, 1);
         CheckerCallback cb = new CheckerCallback();
         checker.checkLedger(lh, cb);
         Set<LedgerFragment> result = cb.waitAndGetResult();

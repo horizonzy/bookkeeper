@@ -22,7 +22,6 @@ package org.apache.bookkeeper.bookie;
 import com.google.common.util.concurrent.RateLimiter;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,7 +31,6 @@ import java.util.Optional;
 import java.util.PrimitiveIterator;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.apache.bookkeeper.bookie.CheckpointSource.Checkpoint;
 import org.apache.bookkeeper.common.util.Watcher;
 import org.apache.bookkeeper.conf.ServerConfiguration;
@@ -76,6 +74,11 @@ public class MockLedgerStorage implements CompactableLedgerStorage {
     public void setCheckpointSource(CheckpointSource checkpointSource) {}
     @Override
     public void setCheckpointer(Checkpointer checkpointer) {}
+
+    @Override
+    public void setStorageStorageNotificationListener(LedgerStorageNotificationListener storageNotificationListener) {
+
+    }
 
     @Override
     public void start() {}
@@ -275,6 +278,30 @@ public class MockLedgerStorage implements CompactableLedgerStorage {
     @Override
     public void forceGC(Boolean forceMajor, Boolean forceMinor) {
         CompactableLedgerStorage.super.forceGC(forceMajor, forceMinor);
+    }
+
+    public void suspendMinorGC() {
+        CompactableLedgerStorage.super.suspendMinorGC();
+    }
+
+    public void suspendMajorGC() {
+        CompactableLedgerStorage.super.suspendMajorGC();
+    }
+
+    public void resumeMinorGC() {
+        CompactableLedgerStorage.super.resumeMinorGC();
+    }
+
+    public void resumeMajorGC() {
+        CompactableLedgerStorage.super.suspendMajorGC();
+    }
+
+    public boolean isMajorGcSuspended() {
+        return CompactableLedgerStorage.super.isMajorGcSuspended();
+    }
+
+    public boolean isMinorGcSuspended() {
+        return CompactableLedgerStorage.super.isMinorGcSuspended();
     }
 
     @Override

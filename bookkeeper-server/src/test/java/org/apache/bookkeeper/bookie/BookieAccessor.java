@@ -1,4 +1,4 @@
-/**
+/*
  *
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,7 +21,6 @@
 package org.apache.bookkeeper.bookie;
 
 import java.io.IOException;
-
 import org.apache.bookkeeper.bookie.CheckpointSource.Checkpoint;
 
 /**

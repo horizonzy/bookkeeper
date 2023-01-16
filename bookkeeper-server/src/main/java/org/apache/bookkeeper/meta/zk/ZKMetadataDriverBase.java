@@ -30,7 +30,6 @@ import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
@@ -279,7 +278,9 @@ public class ZKMetadataDriverBase implements AutoCloseable {
                 if (KeeperException.Code.OK.intValue() == rc) {
                     createResult.complete(null);
                 } else if (KeeperException.Code.NODEEXISTS.intValue() == rc) {
-                    log.debug("health check already disabled!");
+                    if (log.isDebugEnabled()) {
+                        log.debug("health check already disabled!");
+                    }
                     createResult.complete(null);
                 } else {
                     createResult.completeExceptionally(KeeperException.create(KeeperException.Code.get(rc), path));
@@ -299,7 +300,9 @@ public class ZKMetadataDriverBase implements AutoCloseable {
                 if (KeeperException.Code.OK.intValue() == rc) {
                     deleteResult.complete(null);
                 } else if (KeeperException.Code.NONODE.intValue() == rc) {
-                    log.debug("health check already enabled!");
+                    if (log.isDebugEnabled()) {
+                        log.debug("health check already enabled!");
+                    }
                     deleteResult.complete(null);
                 } else {
                     deleteResult.completeExceptionally(KeeperException.create(KeeperException.Code.get(rc), path));
