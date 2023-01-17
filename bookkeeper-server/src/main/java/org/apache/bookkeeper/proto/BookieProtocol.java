@@ -332,10 +332,6 @@ public interface BookieProtocol {
             return (flags & FLAG_RECOVERY_ADD) == FLAG_RECOVERY_ADD;
         }
 
-        void release() {
-            ReferenceCountUtil.safeRelease(data);
-        }
-
         private final Handle<ParsedAddRequest> recyclerHandle;
         private ParsedAddRequest(Handle<ParsedAddRequest> recyclerHandle) {
             this.recyclerHandle = recyclerHandle;
@@ -353,6 +349,7 @@ public interface BookieProtocol {
             ledgerId = -1;
             entryId = -1;
             masterKey = null;
+            ReferenceCountUtil.safeRelease(data);
             data = null;
             recyclerHandle.recycle(this);
         }

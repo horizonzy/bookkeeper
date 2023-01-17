@@ -65,7 +65,6 @@ class WriteEntryProcessor extends PacketProcessorBase<ParsedAddRequest> implemen
             sendWriteReqResponse(BookieProtocol.EREADONLY,
                          ResponseBuilder.buildErrorResponse(BookieProtocol.EREADONLY, request),
                          requestProcessor.getRequestStats().getAddRequestStats());
-            request.release();
             request.recycle();
             return;
         }
@@ -101,8 +100,6 @@ class WriteEntryProcessor extends PacketProcessorBase<ParsedAddRequest> implemen
                       request.ledgerId, request.entryId, t.getMessage(), t);
             // some bad request which cause unexpected exception
             rc = BookieProtocol.EBADREQ;
-        } finally {
-            ReferenceCountUtil.safeRelease(addData);
         }
 
         if (rc != BookieProtocol.EOK) {
