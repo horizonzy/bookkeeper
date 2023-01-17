@@ -73,7 +73,6 @@ class WriteEntryProcessor extends PacketProcessorBase<ParsedAddRequest> implemen
         int rc = BookieProtocol.EOK;
         ByteBuf addData = request.getData();
         try {
-            addData.retain();
             if (request.isRecoveryAdd()) {
                 requestProcessor.getBookie().recoveryAddEntry(addData, this, channel, request.getMasterKey());
             } else {
@@ -101,8 +100,6 @@ class WriteEntryProcessor extends PacketProcessorBase<ParsedAddRequest> implemen
                       request.ledgerId, request.entryId, t.getMessage(), t);
             // some bad request which cause unexpected exception
             rc = BookieProtocol.EBADREQ;
-        } finally {
-            ReferenceCountUtil.safeRelease(addData);
         }
 
         if (rc != BookieProtocol.EOK) {
