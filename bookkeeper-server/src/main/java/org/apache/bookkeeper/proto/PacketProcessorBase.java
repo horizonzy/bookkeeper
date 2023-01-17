@@ -173,9 +173,11 @@ abstract class PacketProcessorBase<T extends Request> implements Runnable {
                          ResponseBuilder.buildErrorResponse(BookieProtocol.EBADVERSION, request),
                          requestProcessor.getRequestStats().getReadRequestStats());
             if (request instanceof BookieProtocol.ReadRequest) {
+                request.recycle();
                 requestProcessor.onReadRequestFinish();
             }
             if (request instanceof BookieProtocol.AddRequest) {
+                request.recycle();
                 requestProcessor.onAddRequestFinish();
             }
             return;

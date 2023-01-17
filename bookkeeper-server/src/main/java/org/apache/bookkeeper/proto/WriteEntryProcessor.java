@@ -65,7 +65,6 @@ class WriteEntryProcessor extends PacketProcessorBase<ParsedAddRequest> implemen
             sendWriteReqResponse(BookieProtocol.EREADONLY,
                          ResponseBuilder.buildErrorResponse(BookieProtocol.EREADONLY, request),
                          requestProcessor.getRequestStats().getAddRequestStats());
-            request.release();
             request.recycle();
             return;
         }
@@ -74,9 +73,9 @@ class WriteEntryProcessor extends PacketProcessorBase<ParsedAddRequest> implemen
         int rc = BookieProtocol.EOK;
         ByteBuf addData = request.getData();
         try {
+            addData.retain();
             if (request.isRecoveryAdd()) {
                 requestProcessor.getBookie().recoveryAddEntry(addData, this, channel, request.getMasterKey());
-            } else {
                 requestProcessor.getBookie().addEntry(addData, false, this, channel, request.getMasterKey());
             }
         } catch (OperationRejectedException e) {
