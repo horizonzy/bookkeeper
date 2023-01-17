@@ -80,7 +80,6 @@ public class WriteEntryProcessorTest {
     }
 
     private void reinitRequest(short flags) {
-        request.release();
         request.recycle();
         processor.recycle();
 

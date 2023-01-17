@@ -76,6 +76,7 @@ class WriteEntryProcessor extends PacketProcessorBase<ParsedAddRequest> implemen
             addData.retain();
             if (request.isRecoveryAdd()) {
                 requestProcessor.getBookie().recoveryAddEntry(addData, this, channel, request.getMasterKey());
+            } else {
                 requestProcessor.getBookie().addEntry(addData, false, this, channel, request.getMasterKey());
             }
         } catch (OperationRejectedException e) {
