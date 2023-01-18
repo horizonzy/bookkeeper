@@ -64,6 +64,7 @@ class WriteEntryProcessor extends PacketProcessorBase<ParsedAddRequest> implemen
             sendWriteReqResponse(BookieProtocol.EREADONLY,
                          ResponseBuilder.buildErrorResponse(BookieProtocol.EREADONLY, request),
                          requestProcessor.getRequestStats().getAddRequestStats());
+            request.release();
             request.recycle();
             return;
         }

@@ -177,6 +177,7 @@ abstract class PacketProcessorBase<T extends Request> implements Runnable {
                 requestProcessor.onReadRequestFinish();
             }
             if (request instanceof BookieProtocol.ParsedAddRequest) {
+                ((BookieProtocol.ParsedAddRequest) request).release();
                 request.recycle();
                 requestProcessor.onAddRequestFinish();
             }
