@@ -510,7 +510,7 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                     Thread.currentThread().interrupt();
                     LOG.info("ForceWrite thread interrupted");
                     // close is idempotent
-                    if (requestsCount > 0) {
+                    if (requestsCount > 0 && requestsCount <= localRequests.length) {
                         ForceWriteRequest req = localRequests[requestsCount - 1];
                         req.shouldClose = true;
                         req.closeFileIfNecessary();
