@@ -1018,7 +1018,7 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                     }
 
                     dequeueStartTime = MathUtils.nowInNano();
-    
+
                     if (localQueueEntriesLen > 0) {
                         qe = localQueueEntries[localQueueEntriesIdx++];
                         journalStats.getJournalQueueSize().dec();
