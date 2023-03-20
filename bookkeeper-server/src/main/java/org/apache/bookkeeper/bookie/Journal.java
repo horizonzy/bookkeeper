@@ -473,13 +473,12 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
             }
 
             final ForceWriteRequest[] localRequests = new ForceWriteRequest[conf.getJournalQueueSize()];
-            int requestsCount = 0;
 
             while (running) {
                 try {
                     int numEntriesInLastForceWrite = 0;
 
-                    requestsCount = forceWriteRequests.takeAll(localRequests);
+                    int requestsCount = forceWriteRequests.takeAll(localRequests);
 
                     journalStats.getForceWriteQueueSize().addCount(-requestsCount);
 
@@ -494,7 +493,6 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                         numEntriesInLastForceWrite += req.process();
                         req.recycle();
                     }
-                    requestsCount = 0;
                     Arrays.fill(localRequests, 0, requestsCount, null);
                     journalStats.getForceWriteGroupingCountStats()
                             .registerSuccessfulValue(numEntriesInLastForceWrite);
@@ -509,13 +507,6 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     LOG.info("ForceWrite thread interrupted");
-                    // close is idempotent
-                    int lastIndex = requestsCount - 1;
-                    if (lastIndex >= 0) {
-                        ForceWriteRequest req = localRequests[lastIndex];
-                        req.shouldClose = true;
-                        req.closeFileIfNecessary();
-                    }
                     running = false;
                 }
             }
