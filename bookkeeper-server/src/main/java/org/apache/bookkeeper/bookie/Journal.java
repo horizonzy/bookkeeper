@@ -495,6 +495,7 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                         req.recycle();
                     }
                     requestsCount = 0;
+                    Arrays.fill(localRequests, 0, requestsCount, null);
                     journalStats.getForceWriteGroupingCountStats()
                             .registerSuccessfulValue(numEntriesInLastForceWrite);
 
