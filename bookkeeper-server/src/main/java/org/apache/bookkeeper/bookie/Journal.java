@@ -993,9 +993,10 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                 if (qe == null) {
                     if (dequeueStartTime != 0) {
                         journalStats.getJournalProcessTimeStats()
-                                .registerSuccessfulEvent(MathUtils.elapsedNanos(dequeueStartTime), TimeUnit.NANOSECONDS);
+                                .registerSuccessfulEvent(MathUtils.elapsedNanos(dequeueStartTime),
+                                        TimeUnit.NANOSECONDS);
                     }
-    
+
                     // At this point the local queue will always be empty, otherwise we would have
                     // advanced to the next `qe` at the end of the loop
                     localQueueEntriesIdx = 0;
@@ -1006,22 +1007,28 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                     } else {
                         // There are already some entries pending. We must adjust
                         // the waiting time to the remaining groupWait time
-                        long pollWaitTimeNanos = maxGroupWaitInNanos - MathUtils.elapsedNanos(toFlush.get(0).enqueueTime);
+                        long pollWaitTimeNanos =
+                                maxGroupWaitInNanos - MathUtils.elapsedNanos(toFlush.get(0).enqueueTime);
                         if (flushWhenQueueEmpty || pollWaitTimeNanos < 0) {
                             pollWaitTimeNanos = 0;
                         }
-    
-                        localQueueEntriesLen = queue.pollAll(localQueueEntries, pollWaitTimeNanos, TimeUnit.NANOSECONDS);
+
+                        localQueueEntriesLen = queue.pollAll(localQueueEntries, pollWaitTimeNanos,
+                                TimeUnit.NANOSECONDS);
                     }
-    
+
                     dequeueStartTime = MathUtils.nowInNano();
-    
+
                     if (localQueueEntriesLen > 0) {
                         qe = localQueueEntries[localQueueEntriesIdx++];
                         journalStats.getJournalQueueSize().dec();
                         journalStats.getJournalQueueStats()
                                 .registerSuccessfulEvent(MathUtils.elapsedNanos(qe.enqueueTime), TimeUnit.NANOSECONDS);
                     }
+                } else {
+                    journalStats.getJournalQueueSize().dec();
+                    journalStats.getJournalQueueStats()
+                            .registerSuccessfulEvent(MathUtils.elapsedNanos(qe.enqueueTime), TimeUnit.NANOSECONDS);
                 }
 
                 if (numEntriesToFlush > 0) {
