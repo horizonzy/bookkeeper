@@ -1022,6 +1022,10 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                         journalStats.getJournalQueueStats()
                                 .registerSuccessfulEvent(MathUtils.elapsedNanos(qe.enqueueTime), TimeUnit.NANOSECONDS);
                     }
+                } else {
+                    journalStats.getJournalQueueSize().dec();
+                    journalStats.getJournalQueueStats()
+                            .registerSuccessfulEvent(MathUtils.elapsedNanos(qe.enqueueTime), TimeUnit.NANOSECONDS);
                 }
 
                 if (numEntriesToFlush > 0) {
