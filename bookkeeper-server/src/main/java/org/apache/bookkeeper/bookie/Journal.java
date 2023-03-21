@@ -21,6 +21,8 @@
 
 package org.apache.bookkeeper.bookie;
 
+import com.carrotsearch.hppc.ObjectHashSet;
+import com.carrotsearch.hppc.procedures.ObjectProcedure;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import io.netty.buffer.ByteBuf;
@@ -37,7 +39,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadFactory;
@@ -51,7 +52,7 @@ import org.apache.bookkeeper.common.collections.RecyclableArrayList;
 import org.apache.bookkeeper.common.util.MemoryLimitController;
 import org.apache.bookkeeper.common.util.affinity.CpuAffinity;
 import org.apache.bookkeeper.conf.ServerConfiguration;
-import org.apache.bookkeeper.processor.RequestProcessor;
+import org.apache.bookkeeper.proto.BookieRequestHandler;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.WriteCallback;
 import org.apache.bookkeeper.stats.Counter;
 import org.apache.bookkeeper.stats.NullStatsLogger;
@@ -333,6 +334,10 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
             recycle();
         }
 
+        private Object getCtx() {
+            return ctx;
+        }
+
         private final Handle<QueueEntry> recyclerHandle;
 
         private QueueEntry(Handle<QueueEntry> recyclerHandle) {
@@ -366,19 +371,31 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
         private boolean shouldClose;
         private long lastFlushedPosition;
         private long logId;
+        private boolean flushed;
 
-        public int process() {
+        public int process(ObjectHashSet<BookieRequestHandler> writeHandlers) {
             closeFileIfNecessary();
 
             // Notify the waiters that the force write succeeded
             for (int i = 0; i < forceWriteWaiters.size(); i++) {
                 QueueEntry qe = forceWriteWaiters.get(i);
                 if (qe != null) {
+                    if (qe.getCtx() instanceof BookieRequestHandler
+                            && qe.entryId != BookieImpl.METAENTRY_ID_FORCE_LEDGER) {
+                        writeHandlers.add((BookieRequestHandler) qe.getCtx());
+                    }
                     qe.run();
                 }
             }
 
             return forceWriteWaiters.size();
+        }
+
+        private void flushFileToDisk() throws IOException {
+            if (!flushed) {
+                logFile.forceWrite(false);
+                flushed = true;
+            }
         }
 
         public void closeFileIfNecessary() {
@@ -387,7 +404,7 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                 // We should guard against exceptions so its
                 // safe to call in catch blocks
                 try {
-                    logFile.forceWrite(false);
+                    flushFileToDisk();
                     logFile.close();
                     // Call close only once
                     shouldClose = false;
@@ -446,7 +463,6 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
         // successful force write
         Thread threadToNotifyOnEx;
 
-        RequestProcessor requestProcessor;
         // should we group force writes
         private final boolean enableGroupForceWrites;
         private final Counter forceWriteThreadTime;
@@ -473,6 +489,7 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
             }
 
             final ForceWriteRequest[] localRequests = new ForceWriteRequest[conf.getJournalQueueSize()];
+            final ObjectHashSet<BookieRequestHandler> writeHandlers = new ObjectHashSet<>();
 
             while (running) {
                 try {
@@ -490,17 +507,16 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                     // responses
                     for (int i = 0; i < requestsCount; i++) {
                         ForceWriteRequest req = localRequests[i];
-                        numEntriesInLastForceWrite += req.process();
+                        numEntriesInLastForceWrite += req.process(writeHandlers);
+                        localRequests[i] = null;
                         req.recycle();
                     }
-                    Arrays.fill(localRequests, 0, requestsCount, null);
                     journalStats.getForceWriteGroupingCountStats()
                             .registerSuccessfulValue(numEntriesInLastForceWrite);
-
-                    if (requestProcessor != null) {
-                        requestProcessor.flushPendingResponses();
-                    }
-
+                    writeHandlers.forEach(
+                            (ObjectProcedure<? super BookieRequestHandler>)
+                                    BookieRequestHandler::flushPendingResponse);
+                    writeHandlers.clear();
                 } catch (IOException ioe) {
                     LOG.error("I/O exception in ForceWrite thread", ioe);
                     running = false;
@@ -519,7 +535,7 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
         private void syncJournal(ForceWriteRequest lastRequest) throws IOException {
             long fsyncStartTime = MathUtils.nowInNano();
             try {
-                lastRequest.logFile.forceWrite(false);
+                lastRequest.flushFileToDisk();
                 journalStats.getJournalSyncStats().registerSuccessfulEvent(MathUtils.elapsedNanos(fsyncStartTime),
                         TimeUnit.NANOSECONDS);
                 lastLogMark.setCurLogMark(lastRequest.logId, lastRequest.lastFlushedPosition);
@@ -884,7 +900,7 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
         memoryLimitController.reserveMemory(entry.readableBytes());
 
         queue.put(QueueEntry.create(
-                entry, ackBeforeSync,  ledgerId, entryId, cb, ctx, MathUtils.nowInNano(),
+                entry, ackBeforeSync, ledgerId, entryId, cb, ctx, MathUtils.nowInNano(),
                 journalStats.getJournalAddEntryStats(),
                 callbackTime));
     }
@@ -964,6 +980,9 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
             int localQueueEntriesIdx = 0;
             int localQueueEntriesLen = 0;
 
+            final ObjectHashSet<BookieRequestHandler> writeHandlers = new ObjectHashSet<>();
+
+
             QueueEntry qe = null;
             while (true) {
                 // new journal file to write
@@ -1020,7 +1039,8 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                     dequeueStartTime = MathUtils.nowInNano();
 
                     if (localQueueEntriesLen > 0) {
-                        qe = localQueueEntries[localQueueEntriesIdx++];
+                        qe = localQueueEntries[localQueueEntriesIdx];
+                        localQueueEntries[localQueueEntriesIdx++] = null;
                         journalStats.getJournalQueueSize().dec();
                         journalStats.getJournalQueueStats()
                                 .registerSuccessfulEvent(MathUtils.elapsedNanos(qe.enqueueTime), TimeUnit.NANOSECONDS);
@@ -1080,12 +1100,17 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                             if (entry != null && (!syncData || entry.ackBeforeSync)) {
                                 toFlush.set(i, null);
                                 numEntriesToFlush--;
+                                if (entry.getCtx() instanceof BookieRequestHandler
+                                        && entry.entryId != BookieImpl.METAENTRY_ID_FORCE_LEDGER) {
+                                    writeHandlers.add((BookieRequestHandler) entry.getCtx());
+                                }
                                 entry.run();
                             }
-                            if (forceWriteThread.requestProcessor != null) {
-                                forceWriteThread.requestProcessor.flushPendingResponses();
-                            }
                         }
+                        writeHandlers.forEach(
+                                (ObjectProcedure<? super BookieRequestHandler>)
+                                        BookieRequestHandler::flushPendingResponse);
+                        writeHandlers.clear();
 
                         lastFlushPosition = bc.position();
                         journalStats.getJournalFlushStats().registerSuccessfulEvent(
@@ -1179,9 +1204,9 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                 numEntriesToFlush++;
 
                 if (localQueueEntriesIdx < localQueueEntriesLen) {
-                    qe = localQueueEntries[localQueueEntriesIdx++];
+                    qe = localQueueEntries[localQueueEntriesIdx];
+                    localQueueEntries[localQueueEntriesIdx++] = null;
                 } else {
-                    Arrays.fill(localQueueEntries, 0, localQueueEntriesLen, null);
                     qe = null;
                 }
             }
@@ -1206,10 +1231,6 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
 
     public BufferedChannelBuilder getBufferedChannelBuilder() {
         return (FileChannel fc, int capacity) -> new BufferedChannel(allocator, fc, capacity);
-    }
-
-    public void setRequestProcessor(RequestProcessor requestProcessor) {
-        forceWriteThread.requestProcessor = requestProcessor;
     }
 
     /**
