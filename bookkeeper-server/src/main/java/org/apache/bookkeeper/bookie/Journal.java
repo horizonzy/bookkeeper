@@ -39,7 +39,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadFactory;
@@ -509,9 +508,9 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                     for (int i = 0; i < requestsCount; i++) {
                         ForceWriteRequest req = localRequests[i];
                         numEntriesInLastForceWrite += req.process(writeHandlers);
+                        localRequests[i] = null;
                         req.recycle();
                     }
-                    Arrays.fill(localRequests, 0, requestsCount, null);
                     journalStats.getForceWriteGroupingCountStats()
                             .registerSuccessfulValue(numEntriesInLastForceWrite);
                     writeHandlers.forEach(
@@ -1038,7 +1037,8 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                     dequeueStartTime = MathUtils.nowInNano();
 
                     if (localQueueEntriesLen > 0) {
-                        qe = localQueueEntries[localQueueEntriesIdx++];
+                        qe = localQueueEntries[localQueueEntriesIdx];
+                        localQueueEntries[localQueueEntriesIdx++] = null;
                         journalStats.getJournalQueueSize().dec();
                         journalStats.getJournalQueueStats()
                                 .registerSuccessfulEvent(MathUtils.elapsedNanos(qe.enqueueTime), TimeUnit.NANOSECONDS);
@@ -1202,9 +1202,9 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                 numEntriesToFlush++;
 
                 if (localQueueEntriesIdx < localQueueEntriesLen) {
-                    qe = localQueueEntries[localQueueEntriesIdx++];
+                    qe = localQueueEntries[localQueueEntriesIdx];
+                    localQueueEntries[localQueueEntriesIdx++] = null;
                 } else {
-                    Arrays.fill(localQueueEntries, 0, localQueueEntriesLen, null);
                     qe = null;
                 }
             }
