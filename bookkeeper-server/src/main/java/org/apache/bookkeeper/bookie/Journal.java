@@ -1125,7 +1125,6 @@ public class Journal extends BookieCriticalThread implements CheckpointSource {
                         }
 
                         journalStats.getForceWriteBatchEntriesStats()
-
                                 .registerSuccessfulValue(numEntriesToFlush);
                         journalStats.getForceWriteBatchBytesStats()
                                 .registerSuccessfulValue(batchSize);
