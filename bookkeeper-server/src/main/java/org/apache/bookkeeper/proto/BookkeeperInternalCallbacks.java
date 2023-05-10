@@ -22,6 +22,8 @@
 package org.apache.bookkeeper.proto;
 
 import io.netty.buffer.ByteBuf;
+
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -36,6 +38,7 @@ import org.apache.bookkeeper.client.api.LedgerMetadata;
 import org.apache.bookkeeper.net.BookieId;
 import org.apache.bookkeeper.stats.OpStatsLogger;
 import org.apache.bookkeeper.util.AvailabilityOfEntriesOfLedger;
+import org.apache.bookkeeper.util.ByteBufList;
 import org.apache.bookkeeper.util.MathUtils;
 import org.apache.bookkeeper.versioning.Versioned;
 import org.apache.zookeeper.AsyncCallback;
@@ -219,6 +222,10 @@ public class BookkeeperInternalCallbacks {
      */
     public interface ReadEntryCallback {
         void readEntryComplete(int rc, long ledgerId, long entryId, ByteBuf buffer, Object ctx);
+    }
+
+    public interface BatchedReadEntryCallback {
+        void readEntriesComplete(int rc, long ledgerId, long startEntryId, ByteBufList bufList, Object ctx);
     }
 
     /**

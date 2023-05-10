@@ -638,6 +638,16 @@ public class LedgerHandle implements WriteHandle {
         return SyncCallbackUtils.waitForResult(result);
     }
 
+    public Enumeration<LedgerEntry> readEntries(long firstEntry, int maxCount, long maxSize)
+            throws InterruptedException, BKException {
+        CompletableFuture<Enumeration<LedgerEntry>> result = new CompletableFuture<>();
+
+        asyncReadEntries(firstEntry, maxCount, maxSize, new SyncReadCallback(result), null);
+
+        return SyncCallbackUtils.waitForResult(result);
+    }
+
+
     /**
      * Read a sequence of entries synchronously, allowing to read after the LastAddConfirmed range.<br>
      * This is the same of
@@ -690,6 +700,18 @@ public class LedgerHandle implements WriteHandle {
         }
 
         asyncReadEntriesInternal(firstEntry, lastEntry, cb, ctx, false);
+    }
+
+    public void asyncReadEntries(long firstEntry, int maxCount, long maxSize, ReadCallback cb, Object ctx) {
+        // Little sanity check
+        if (firstEntry > lastAddConfirmed) {
+            LOG.error("ReadEntries exception on ledgerId:{} firstEntry:{} lastAddConfirmed:{}",
+                    ledgerId, firstEntry, lastAddConfirmed);
+            cb.readComplete(BKException.Code.ReadException, this, null, ctx);
+            return;
+        }
+
+        asyncReadEntriesInternal(firstEntry, maxCount, maxSize, cb, ctx, false);
     }
 
     /**
@@ -757,6 +779,60 @@ public class LedgerHandle implements WriteHandle {
         return readEntriesInternalAsync(firstEntry, lastEntry, false);
     }
 
+    @Override
+    public CompletableFuture<LedgerEntries> readAsync(long startEntry, int maxCount, long maxSize) {
+        // Little sanity check
+        if (startEntry > lastAddConfirmed) {
+            LOG.error("ReadAsync exception on ledgerId:{} firstEntry:{} lastAddConfirmed:{}",
+                    ledgerId, startEntry, lastAddConfirmed);
+            return FutureUtils.exception(new BKReadException());
+        }
+
+        return readEntriesInternalAsync(startEntry, maxCount, maxSize, false);
+    }
+
+    private CompletableFuture<LedgerEntries> readEntriesInternalAsync(long startEntry, int maxCount, long maxSize,
+                                                                      boolean isRecoveryRead) {
+        BatchedReadOp op = new BatchedReadOp(this, clientCtx,
+                startEntry, maxCount, maxSize, isRecoveryRead);
+        if (!clientCtx.isClientClosed()) {
+            // Waiting on the first one.
+            // This is not very helpful if there are multiple ensembles or if bookie goes into unresponsive
+            // state later after N requests sent.
+            // Unfortunately it seems that alternatives are:
+            // - send reads one-by-one (up to the app)
+            // - rework LedgerHandle to send requests one-by-one (maybe later, potential perf impact)
+            // - block worker pool (not good)
+            // Even with this implementation one should be more concerned about OOME when all read responses arrive
+            // or about overloading bookies with these requests then about submission of many small requests.
+            // Naturally one of the solutions would be to submit smaller batches and in this case
+            // current implementation will prevent next batch from starting when bookie is
+            // unresponsive thus helpful enough.
+            if (clientCtx.getConf().waitForWriteSetMs >= 0) {
+                DistributionSchedule.WriteSet ws = distributionSchedule.getWriteSet(startEntry);
+                try {
+                    if (!waitForWritable(ws, ws.size() - 1, clientCtx.getConf().waitForWriteSetMs)) {
+                        op.allowFailFastOnUnwritableChannel();
+                    }
+                } finally {
+                    ws.recycle();
+                }
+            }
+
+            if (isHandleWritable()) {
+                // Ledger handle in read/write mode: submit to OSE for ordered execution.
+                executeOrdered(op);
+            } else {
+                // Read-only ledger handle: bypass OSE and execute read directly in client thread.
+                // This avoids a context-switch to OSE thread and thus reduces latency.
+                op.run();
+            }
+        } else {
+            op.future().completeExceptionally(BKException.create(ClientClosedException));
+        }
+        return op.future();
+    }
+
     /**
      * Read a sequence of entries asynchronously, allowing to read after the LastAddConfirmed range.
      * <br>This is the same of
@@ -820,6 +896,40 @@ public class LedgerHandle implements WriteHandle {
                             cb.readComplete(Code.UnexpectedConditionException, LedgerHandle.this, null, ctx);
                         }
                     }
+                    }, clientCtx.getMainWorkerPool().chooseThread(ledgerId));
+        } else {
+            cb.readComplete(Code.ClientClosedException, LedgerHandle.this, null, ctx);
+        }
+    }
+
+    void asyncReadEntriesInternal(long firstEntry, int maxCount, long maxSize, ReadCallback cb,
+                                  Object ctx, boolean isRecoveryRead) {
+        if (!clientCtx.isClientClosed()) {
+            readEntriesInternalAsync(firstEntry, maxCount, maxSize, isRecoveryRead)
+                    .whenCompleteAsync(new FutureEventListener<LedgerEntries>() {
+                        @Override
+                        public void onSuccess(LedgerEntries entries) {
+                            cb.readComplete(
+                                    Code.OK,
+                                    LedgerHandle.this,
+                                    IteratorUtils.asEnumeration(
+                                            Iterators.transform(entries.iterator(), le -> {
+                                                LedgerEntry entry = new LedgerEntry((LedgerEntryImpl) le);
+                                                le.close();
+                                                return entry;
+                                            })),
+                                    ctx);
+                        }
+
+                        @Override
+                        public void onFailure(Throwable cause) {
+                            if (cause instanceof BKException) {
+                                BKException bke = (BKException) cause;
+                                cb.readComplete(bke.getCode(), LedgerHandle.this, null, ctx);
+                            } else {
+                                cb.readComplete(Code.UnexpectedConditionException, LedgerHandle.this, null, ctx);
+                            }
+                        }
                     }, clientCtx.getMainWorkerPool().chooseThread(ledgerId));
         } else {
             cb.readComplete(Code.ClientClosedException, LedgerHandle.this, null, ctx);

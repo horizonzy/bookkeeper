@@ -21,6 +21,7 @@
 package org.apache.bookkeeper.test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import io.netty.buffer.ByteBuf;
@@ -36,6 +37,8 @@ import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.apache.bookkeeper.bookie.MockUncleanShutdownDetection;
 import org.apache.bookkeeper.bookie.TestBookieImpl;
 import org.apache.bookkeeper.client.BKException;
@@ -53,6 +56,7 @@ import org.apache.bookkeeper.proto.BookieClient;
 import org.apache.bookkeeper.proto.BookieClientImpl;
 import org.apache.bookkeeper.proto.BookieProtocol;
 import org.apache.bookkeeper.proto.BookieServer;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GetBookieInfoCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.ReadEntryCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.WriteCallback;
@@ -62,6 +66,7 @@ import org.apache.bookkeeper.test.TestStatsProvider.TestOpStatsLogger;
 import org.apache.bookkeeper.test.TestStatsProvider.TestStatsLogger;
 import org.apache.bookkeeper.util.ByteBufList;
 import org.apache.bookkeeper.util.IOUtils;
+import org.awaitility.Awaitility;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -346,5 +351,37 @@ public class BookieClientTest {
         int expectedBookieInfoSuccessCount = (limitStatsLogging) ? 0 : 1;
         assertEquals("BookieInfoSuccessCount", expectedBookieInfoSuccessCount,
                 perChannelBookieClientScopeOfThisAddr.getSuccessCount());
+    }
+
+    @Test
+    public void testBatchedRead() throws Exception {
+        ClientConfiguration conf = new ClientConfiguration();
+        conf.setUseV2WireProtocol(true);
+        BookieClient bc = new BookieClientImpl(conf, eventLoopGroup,
+                UnpooledByteBufAllocator.DEFAULT, executor, scheduler, NullStatsLogger.INSTANCE,
+                BookieSocketAddress.LEGACY_BOOKIEID_RESOLVER);
+        ByteBufList bb = createByteBuffer(1, 1, 1);
+        BookieId addr = bs.getBookieId();
+        byte[] passwd = new byte[20];
+        Arrays.fill(passwd, (byte) 'a');
+        ResultStruct arc = new ResultStruct();
+
+        final int entries = 10;
+        for (int i = 0; i < entries; i++) {
+            bc.addEntry(addr, 1, passwd, i, bb, wrcb, arc, BookieProtocol.FLAG_NONE, false, WriteFlag.NONE);
+        }
+        AtomicReference<ByteBufList> result = new AtomicReference<>();
+        Awaitility.await().untilAsserted(() -> {
+            assertEquals(0, arc.rc);
+        });
+
+        bc.readEntries(addr, 1, 1, 5, -1, (rc, ledgerId, startEntryId, bufList, ctx) -> {
+            result.set(bufList);
+        }, null, BookieProtocol.FLAG_NONE);
+
+        Awaitility.await().untilAsserted(() -> {
+            assertNotNull(result.get());
+            assertEquals(result.get().size(), 5);
+        });
     }
 }

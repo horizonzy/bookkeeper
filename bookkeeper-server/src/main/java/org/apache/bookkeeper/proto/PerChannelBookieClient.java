@@ -101,6 +101,7 @@ import org.apache.bookkeeper.common.util.OrderedExecutor;
 import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.bookkeeper.net.BookieId;
 import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.BatchedReadEntryCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.ForceLedgerCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GetBookieInfoCallback;
@@ -1000,6 +1001,49 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
         writeAndFlush(channel, completionKey, request, allowFastFail);
     }
 
+    public void readEntries(final long ledgerId,
+                            final long startEntryId,
+                            final int maxCount,
+                            final long maxSize,
+                            BatchedReadEntryCallback cb,
+                            Object ctx,
+                            int flags,
+                            byte[] masterKey,
+                            boolean allowFastFail) {
+
+        readEntriesInternal(ledgerId, startEntryId, maxCount, maxSize, null, null, false,
+                cb, ctx, (short) flags, masterKey, allowFastFail);
+    }
+
+    private void readEntriesInternal(final long ledgerId,
+                                     final long startEntryId,
+                                     final int maxCount,
+                                     final long maxSize,
+                                     final Long previousLAC,
+                                     final Long timeOutInMillis,
+                                     final boolean piggyBackEntry,
+                                     final BatchedReadEntryCallback cb,
+                                     final Object ctx,
+                                     int flags,
+                                     byte[] masterKey,
+                                     boolean allowFastFail) {
+        Object request = null;
+        CompletionKey completionKey = null;
+        final long txnId = getTxnId();
+        if (useV2WireProtocol) {
+            request = BookieProtocol.BatchedReadRequest.create(BookieProtocol.CURRENT_PROTOCOL_VERSION,
+                    ledgerId, startEntryId, (short) flags, masterKey, txnId, maxCount, maxSize);
+            completionKey = new V3CompletionKey(txnId, OperationType.BATCH_READ_ENTRY);
+        } else {
+            throw new UnsupportedOperationException("Unsupported batch read entry operation for v3 protocol.");
+        }
+        BatchedReadCompletion readCompletion = new BatchedReadCompletion(
+                completionKey, cb, ctx, ledgerId, startEntryId);
+        putCompletionKeyValue(completionKey, readCompletion);
+
+        writeAndFlush(channel, completionKey, request, allowFastFail);
+    }
+
     public void getBookieInfo(final long requested, GetBookieInfoCallback cb, Object ctx) {
         final long txnId = getTxnId();
         final CompletionKey completionKey = new V3CompletionKey(txnId, OperationType.GET_BOOKIE_INFO);
@@ -1356,7 +1400,12 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
         OperationType operationType = getOperationType(response.getOpCode());
         StatusCode status = getStatusCodeFromErrorCode(response.errorCode);
 
-        CompletionKey key = acquireV2Key(response.ledgerId, response.entryId, operationType);
+        CompletionKey key;
+        if (OperationType.BATCH_READ_ENTRY == operationType) {
+            key = new V3CompletionKey(((BookieProtocol.BatchedReadResponse) response).getRequestId(), operationType);
+        } else {
+            key = acquireV2Key(response.ledgerId, response.entryId, operationType);
+        }
         CompletionValue completionValue = getCompletionValue(key);
         key.release();
 
@@ -1438,6 +1487,8 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
                 return OperationType.WRITE_LAC;
             case BookieProtocol.GET_BOOKIE_INFO:
                 return OperationType.GET_BOOKIE_INFO;
+            case BookieProtocol.BATCH_READ_ENTRY:
+                return OperationType.BATCH_READ_ENTRY;
             default:
                 throw new IllegalArgumentException("Invalid operation type " + opCode);
         }
@@ -1966,6 +2017,83 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
                 ((ReadLastConfirmedAndEntryContext) ctx).setLacUpdateTimestamp(lacUpdateTimestamp);
             }
             cb.readEntryComplete(rc, ledgerId, entryId, buffer.slice(), ctx);
+        }
+    }
+
+    class BatchedReadCompletion extends CompletionValue {
+
+        final BatchedReadEntryCallback cb;
+
+        public BatchedReadCompletion(final CompletionKey key,
+                                     final BatchedReadEntryCallback originalCallback,
+                                     final Object originalCtx,
+                                     long ledgerId, final long entryId) {
+            super("BatchedRead", originalCtx, ledgerId, entryId,
+                    readEntryOpLogger, readTimeoutOpLogger);
+            this.cb = new BatchedReadEntryCallback() {
+
+                @Override
+                public void readEntriesComplete(int rc,
+                                                long ledgerId,
+                                                long startEntryId,
+                                                ByteBufList bufList,
+                                                Object ctx) {
+                    logOpResult(rc);
+                    originalCallback.readEntriesComplete(rc,
+                            ledgerId, entryId,
+                            bufList, originalCtx);
+                    key.release();
+                }
+            };
+        }
+
+        @Override
+        public void errorOut() {
+            errorOut(BKException.Code.BookieHandleNotAvailableException);
+        }
+
+        @Override
+        public void errorOut(final int rc) {
+            errorOutAndRunCallback(
+                    () -> cb.readEntriesComplete(rc, ledgerId,
+                            entryId, null, ctx));
+        }
+
+        @Override
+        public void handleV2Response(long ledgerId,
+                                     long entryId,
+                                     StatusCode status,
+                                     BookieProtocol.Response response) {
+
+            readEntryOutstanding.dec();
+            if (!(response instanceof BookieProtocol.BatchedReadResponse)) {
+                return;
+            }
+            BookieProtocol.BatchedReadResponse readResponse = (BookieProtocol.BatchedReadResponse) response;
+            handleBatchedReadResponse(ledgerId, entryId, status, readResponse.getData(),
+                    INVALID_ENTRY_ID, -1L);
+        }
+
+        @Override
+        public void handleV3Response(Response response) {
+            // V3 protocol haven't supported batched read yet.
+        }
+
+        private void handleBatchedReadResponse(long ledgerId,
+                                        long entryId,
+                                        StatusCode status,
+                                        ByteBufList buffers,
+                                        long maxLAC, // max known lac piggy-back from bookies
+                                        long lacUpdateTimestamp) { // the timestamp when the lac is updated.
+            int rc = convertStatus(status, BKException.Code.ReadException);
+
+            if (maxLAC > INVALID_ENTRY_ID && (ctx instanceof ReadEntryCallbackCtx)) {
+                ((ReadEntryCallbackCtx) ctx).setLastAddConfirmed(maxLAC);
+            }
+            if (lacUpdateTimestamp > -1L && (ctx instanceof ReadLastConfirmedAndEntryContext)) {
+                ((ReadLastConfirmedAndEntryContext) ctx).setLacUpdateTimestamp(lacUpdateTimestamp);
+            }
+            cb.readEntriesComplete(rc, ledgerId, entryId, buffers, ctx);
         }
     }
 

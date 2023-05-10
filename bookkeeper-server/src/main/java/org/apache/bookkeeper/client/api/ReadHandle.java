@@ -45,6 +45,8 @@ public interface ReadHandle extends Handle {
      */
     CompletableFuture<LedgerEntries> readAsync(long firstEntry, long lastEntry);
 
+    CompletableFuture<LedgerEntries> readAsync(long startEntry, int maxCount, long maxSize);
+
     /**
      * Read a sequence of entries synchronously.
      *
@@ -57,6 +59,11 @@ public interface ReadHandle extends Handle {
     default LedgerEntries read(long firstEntry, long lastEntry) throws BKException, InterruptedException {
         return FutureUtils.<LedgerEntries, BKException>result(readAsync(firstEntry, lastEntry),
                                                               BKException.HANDLER);
+    }
+
+    default LedgerEntries read(long startEntry, int maxCount, long maxSize) throws BKException, InterruptedException {
+        return FutureUtils.result(readAsync(startEntry, maxCount, maxSize),
+                BKException.HANDLER);
     }
 
     /**

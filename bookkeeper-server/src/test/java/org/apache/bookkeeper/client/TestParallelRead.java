@@ -268,8 +268,8 @@ public class TestParallelRead extends BookKeeperClusterTestCase {
         PendingReadOp pendingReadOp = new PendingReadOp(lh, clientContext, 1, 2, false);
         pendingReadOp.parallelRead(true);
         pendingReadOp.initiate();
-        PendingReadOp.LedgerEntryRequest first = pendingReadOp.seq.get(0);
-        PendingReadOp.LedgerEntryRequest second = pendingReadOp.seq.get(1);
+        PendingReadOp.SingleLedgerEntryRequest first = pendingReadOp.seq.get(0);
+        PendingReadOp.SingleLedgerEntryRequest second = pendingReadOp.seq.get(1);
 
         pendingReadOp.submitCallback(-105);
 

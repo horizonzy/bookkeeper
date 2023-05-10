@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.apache.bookkeeper.client.api.WriteFlag;
 import org.apache.bookkeeper.net.BookieId;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.BatchedReadEntryCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.ForceLedgerCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GetBookieInfoCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.ReadEntryCallback;
@@ -159,6 +160,21 @@ public interface BookieClient {
                            ReadEntryCallback cb, Object ctx, int flags, byte[] masterKey) {
         readEntry(address, ledgerId, entryId, cb, ctx, flags, masterKey, false);
     }
+
+    default void readEntries(BookieId address, long ledgerId, long startEntryId,
+                             int maxCount, long maxSize, BatchedReadEntryCallback cb, Object ctx,
+                             int flags) {
+        readEntries(address, ledgerId, startEntryId, maxCount, maxSize, cb, ctx, flags, null);
+    }
+    default void readEntries(BookieId address, long ledgerId, long startEntryId,
+                             int maxCount, long maxSize, BatchedReadEntryCallback cb, Object ctx,
+                             int flags, byte[] masterKey) {
+        readEntries(address, ledgerId, startEntryId, maxCount, maxSize, cb, ctx, flags, masterKey, false);
+    }
+
+    void readEntries(BookieId address, long ledgerId, long startEntryId,
+                             int maxCount, long maxSize, BatchedReadEntryCallback cb, Object ctx,
+                             int flags, byte[] masterKey, boolean allowFastFail);
 
     /**
      * Read an entry from bookie at address {@code address}.

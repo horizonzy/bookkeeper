@@ -28,6 +28,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -126,6 +127,28 @@ public class BookieProtoEncoding {
                 ar.recycle();
                 data.prepend(buf);
                 return data;
+            } else if (r instanceof BookieProtocol.BatchedReadRequest) {
+                int totalHeaderSize = 4 // for request type
+                        + 8 // for ledger id
+                        + 8 // for entry id
+                        + 8 // for request id
+                        + 4 // for max count
+                        + 8; // for max size
+                if (r.hasMasterKey()) {
+                    totalHeaderSize += BookieProtocol.MASTER_KEY_LENGTH;
+                }
+                ByteBuf buf = allocator.buffer(totalHeaderSize + 4 /* frame size */);
+                buf.writeInt(totalHeaderSize);
+                buf.writeInt(PacketHeader.toInt(r.getProtocolVersion(), r.getOpCode(), r.getFlags()));
+                buf.writeLong(r.getLedgerId());
+                buf.writeLong(r.getEntryId());
+                buf.writeLong(((BookieProtocol.BatchedReadRequest) r).getRequestId());
+                buf.writeInt(((BookieProtocol.BatchedReadRequest) r).getMaxCount());
+                buf.writeLong(((BookieProtocol.BatchedReadRequest) r).getMaxSize());
+                if (r.hasMasterKey()) {
+                    buf.writeBytes(r.getMasterKey(), 0, BookieProtocol.MASTER_KEY_LENGTH);
+                }
+                return buf;
             } else if (r instanceof BookieProtocol.ReadRequest) {
                 int totalHeaderSize = 4 // for request type
                     + 8 // for ledgerId
@@ -196,6 +219,21 @@ public class BookieProtoEncoding {
                     return new BookieProtocol.ReadRequest(version, ledgerId, entryId, flags, masterKey);
                 } else {
                     return new BookieProtocol.ReadRequest(version, ledgerId, entryId, flags, null);
+                }
+            case BookieProtocol.BATCH_READ_ENTRY:
+                ledgerId = packet.readLong();
+                entryId = packet.readLong();
+                long requestId = packet.readLong();
+                int maxCount = packet.readInt();
+                long maxSize = packet.readLong();
+                if ((flags & BookieProtocol.FLAG_DO_FENCING) == BookieProtocol.FLAG_DO_FENCING
+                        && version >= 2) {
+                    byte[] masterKey = readMasterKey(packet);
+                    return BookieProtocol.BatchedReadRequest.create(version, ledgerId, entryId, flags, masterKey,
+                            requestId, maxCount, maxSize);
+                } else {
+                    return BookieProtocol.BatchedReadRequest.create(version, ledgerId, entryId, flags, null,
+                            requestId, maxCount, maxSize);
                 }
             case BookieProtocol.AUTH:
                 BookkeeperProtocol.AuthMessage.Builder builder = BookkeeperProtocol.AuthMessage.newBuilder();
@@ -275,6 +313,26 @@ public class BookieProtoEncoding {
                     } else {
                         return ByteBufList.get(buf, rr.getData());
                     }
+                }  else if (msg instanceof BookieProtocol.BatchedReadResponse) {
+                    BookieProtocol.BatchedReadResponse brr = (BookieProtocol.BatchedReadResponse) r;
+                    int payloadSize = brr.getData().readableBytes();
+                    int delimiterSize = brr.getData().size() * 4; // The size of each entry.
+                    int responseSize = RESPONSE_HEADERS_SIZE + 8 /* request_id */ + payloadSize + delimiterSize;
+                    int bufferSize = 4 /* frame size */ + responseSize;
+                    ByteBuf buf = allocator.buffer(bufferSize);
+                    buf.writeInt(responseSize);
+                    buf.writeInt(PacketHeader.toInt(r.getProtocolVersion(), r.getOpCode(), (short) 0));
+                    buf.writeInt(r.getErrorCode());
+                    buf.writeLong(r.getLedgerId());
+                    buf.writeLong(r.getEntryId());
+                    buf.writeLong(((BookieProtocol.BatchedReadResponse) r).getRequestId());
+                    for (int i = 0; i < brr.getData().size(); i++) {
+                        ByteBuf entryData = brr.getData().getBuffer(i);
+                        buf.writeInt(entryData.readableBytes());
+                        buf.writeBytes(entryData);
+                    }
+                    brr.release();
+                    return buf;
                 } else if (msg instanceof BookieProtocol.AddResponse) {
                     ByteBuf buf = allocator.buffer(RESPONSE_HEADERS_SIZE + 4 /* frame size */);
                     buf.writeInt(RESPONSE_HEADERS_SIZE);
@@ -324,6 +382,22 @@ public class BookieProtoEncoding {
 
                 return new BookieProtocol.ReadResponse(
                         version, rc, ledgerId, entryId, buffer.retainedSlice());
+            case BookieProtocol.BATCH_READ_ENTRY:
+                rc = buffer.readInt();
+                ledgerId = buffer.readLong();
+                entryId = buffer.readLong();
+                long requestId = buffer.readLong();
+                ByteBufList data = null;
+                while (buffer.readableBytes() > 0) {
+                    int entrySize = buffer.readInt();
+                    if (data == null) {
+                        data = ByteBufList.get(buffer.readBytes(entrySize));
+                    } else {
+                        data.add(buffer.readBytes(entrySize));
+                    }
+                }
+                return new BookieProtocol.BatchedReadResponse(version, rc, ledgerId, entryId, requestId, data == null
+                        ? ByteBufList.get(Unpooled.EMPTY_BUFFER) : data.retain());
             case BookieProtocol.AUTH:
                 ByteBufInputStream bufStream = new ByteBufInputStream(buffer);
                 BookkeeperProtocol.AuthMessage.Builder builder = BookkeeperProtocol.AuthMessage.newBuilder();
