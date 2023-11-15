@@ -66,6 +66,7 @@ class ReadEntryProcessor extends PacketProcessorBase<ReadRequest> {
                 LOG.debug("Dropping read request for closed channel: {}", requestHandler.ctx().channel());
             }
             requestProcessor.onReadRequestFinish();
+            recycle();
             return;
         }
         int errorCode = BookieProtocol.EOK;
@@ -197,7 +198,9 @@ class ReadEntryProcessor extends PacketProcessorBase<ReadRequest> {
         return String.format("ReadEntry(%d, %d)", request.getLedgerId(), request.getEntryId());
     }
 
-    protected void recycle() {
+
+    void recycle() {
+        request.recycle();
         super.reset();
         if (this.recyclerHandle != null) {
             this.recyclerHandle.recycle(this);

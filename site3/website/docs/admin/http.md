@@ -22,9 +22,9 @@ Currently all the HTTP endpoints could be divided into these 5 components:
 * Description: Get heartbeat status for a specific bookie
 * Response: 
 
-| Code   | Description |
-|:-------|:------------|
-|200 | Successful operation |
+    | Code   | Description |
+    |:-------|:------------|
+    |200 | Successful operation |
 
 ## Config
 
@@ -240,7 +240,7 @@ Currently all the HTTP endpoints could be divided into these 5 components:
     * Response:
 
       | Code   | Description |
-              |:-------|:------------|
+      |:-------|:------------|
       |200 | Successful operation |
       |403 | Permission denied |
       |404 | Not found |
@@ -324,6 +324,11 @@ Currently all the HTTP endpoints could be divided into these 5 components:
 ### Endpoint: /api/v1/bookie/gc
 1. Method: PUT
     * Description:  trigger gc for this bookie.
+    * Parameters:
+        | Name | Type | Required | Description |
+        |:-----|:-----|:---------|:------------|
+        |forceMajor  | Boolean | No | only trigger the forceMajor gc for this bookie. |
+        |forceMinor  | Boolean | No | only trigger the forceMinor gc for this bookie. |
     * Response:  
 
         | Code   | Description |
@@ -383,7 +388,7 @@ Currently all the HTTP endpoints could be divided into these 5 components:
     * Response:
 
       | Code   | Description |
-              |:-------|:------------|
+      |:-------|:------------|
       |200 | Successful operation |
       |403 | Permission denied |
       |404 | Not found |
@@ -393,7 +398,7 @@ Currently all the HTTP endpoints could be divided into these 5 components:
     * Response:
 
       | Code   | Description |
-              |:-------|:------------|
+      |:-------|:------------|
       |200 | Successful operation |
       |403 | Permission denied |
       |404 | Not found |
@@ -419,7 +424,7 @@ Currently all the HTTP endpoints could be divided into these 5 components:
     * Response:
 
       | Code   | Description |
-                    |:-------|:------------|
+      |:-------|:------------|
       |200 | Successful operation |
       |403 | Permission denied |
       |404 | Not found |
@@ -476,8 +481,132 @@ Currently all the HTTP endpoints could be divided into these 5 components:
         |503 | Bookie is not ready |
    * Body: &lt;empty&gt;
 
+### Endpoint: /api/v1/bookie/entry_location_compact
+1. Method: PUT
+    * Description:  trigger entry location index rocksDB compact. Trigger all entry location rocksDB compact, if entryLocations not be specified.
+    * Parameters: 
+
+      | Name | Type | Required | Description |
+      |:-----|:-----|:---------|:------------|
+      |entryLocationRocksDBCompact  | String | Yes | Configuration name(key) |
+      |entryLocations | String | no | entry location rocksDB path |
+    * Body:
+         ```json
+         {
+            "entryLocationRocksDBCompact": "true",
+            "entryLocations":"/data1/bookkeeper/ledgers/current/locations,/data2/bookkeeper/ledgers/current/locations"
+         }
+         ```
+    * Response:
+
+      | Code   | Description |
+      |:-------|:------------|
+      |200 | Successful operation |
+      |403 | Permission denied |
+      |405 | Method Not Allowed |
+
+2. Method: GET
+    * Description:  All entry location index rocksDB compact status on bookie. true for is running.
+    * Response:
+
+      | Code   | Description |
+      |:-------|:------------|
+      |200 | Successful operation |
+      |403 | Permission denied |
+      |405 | Method Not Allowed |
+    * Body:
+       ```json
+       {
+          "/data1/bookkeeper/ledgers/current/locations" : true,
+          "/data2/bookkeeper/ledgers/current/locations" : false
+       }
+       ```
+
+### Endpoint: /api/v1/bookie/state/readonly
+1. Method: GET
+    * Description: Get bookie readOnly state.
+    * Response:
+
+      | Code   | Description |
+      |:-------|:------------|
+      |200 | Successful operation |
+      |403 | Permission denied |
+      |404 | Not found |
+    * Body:
+       ```json
+       {
+          "readOnly" : false
+        }
+       ```
+
+2. Method: PUT
+    * Description: Set bookie readOnly state.
+    * Body:
+        ```json
+        {
+          "readOnly": true
+        }
+        ```
+    * Parameters:
+
+      | Name | Type | Required | Description |
+      |:-----|:-----|:---------|:------------|
+      | readOnly | Boolean | Yes |  Whether bookie readOnly state. |
+    * Response:
+
+      | Code   | Description |
+      |:-------|:------------|
+      |200 | Successful operation |
+      |403 | Permission denied |
+      |404 | Not found |
+    * Body:
+        ```json
+        {
+          "readOnly": true
+        }
+        ```
+
 
 ## Auto recovery
+
+### Endpoint: /api/v1/autorecovery/status?enabled=&lt;boolean&gt;
+1. Method: GET
+    * Description:  Get autorecovery enable status with cluster.
+    * Response:
+
+      | Code   | Description |
+      |:-------|:------------|
+      |200 | Successful operation |
+      |403 | Permission denied |
+      |404 | Not found |
+    * Response Body format:
+
+        ```json
+        {
+          "enabled": true
+        }
+        ```
+
+2. Method: PUT
+    * Description:  Set autorecovery enable status with cluster.
+    * Parameters:
+
+      | Name | Type | Required | Description                        |
+      |:-----|:---------|:-----------------------------------|:------------|
+      |enabled    | Boolean | Yes      | Whether autorecovery enable status |
+    * Response:
+
+      | Code   | Description |
+      |:-------|:------------|
+      |200 | Successful operation |
+      |403 | Permission denied |
+      |404 | Not found |
+    * Body:
+        ```json
+        {
+          "enabled": true
+        }
+        ```
 
 ### Endpoint: /api/v1/autorecovery/bookie/
 1. Method: PUT

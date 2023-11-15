@@ -65,6 +65,7 @@ class WriteEntryProcessor extends PacketProcessorBase<ParsedAddRequest> implemen
                          requestProcessor.getRequestStats().getAddRequestStats());
             request.release();
             request.recycle();
+            recycle();
             return;
         }
 
@@ -109,6 +110,7 @@ class WriteEntryProcessor extends PacketProcessorBase<ParsedAddRequest> implemen
                          ResponseBuilder.buildErrorResponse(rc, request),
                          requestProcessor.getRequestStats().getAddRequestStats());
             request.recycle();
+            recycle();
         }
     }
 
@@ -122,9 +124,10 @@ class WriteEntryProcessor extends PacketProcessorBase<ParsedAddRequest> implemen
             requestProcessor.getRequestStats().getAddEntryStats()
                 .registerFailedEvent(MathUtils.elapsedNanos(startTimeNanos), TimeUnit.NANOSECONDS);
         }
-        sendWriteReqResponse(rc,
-                     ResponseBuilder.buildAddResponse(request),
-                     requestProcessor.getRequestStats().getAddRequestStats());
+
+        requestHandler.prepareSendResponseV2(rc, request);
+        requestProcessor.onAddRequestFinish();
+
         request.recycle();
         recycle();
     }

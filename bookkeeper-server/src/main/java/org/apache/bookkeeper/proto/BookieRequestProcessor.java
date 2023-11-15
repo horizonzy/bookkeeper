@@ -30,6 +30,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ByteString;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
+import io.netty.channel.group.ChannelGroup;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.concurrent.Future;
@@ -53,6 +54,7 @@ import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.bookkeeper.tls.SecurityException;
 import org.apache.bookkeeper.tls.SecurityHandlerFactory;
 import org.apache.bookkeeper.tls.SecurityHandlerFactory.NodeType;
+import org.apache.bookkeeper.util.NettyChannelUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -118,6 +120,8 @@ public class BookieRequestProcessor implements RequestProcessor {
     final Semaphore addsSemaphore;
     final Semaphore readsSemaphore;
 
+    final ChannelGroup allChannels;
+
     // to temporary blacklist channels
     final Optional<Cache<Channel, Boolean>> blacklistedChannels;
     final Consumer<Channel> onResponseTimeout;
@@ -127,9 +131,11 @@ public class BookieRequestProcessor implements RequestProcessor {
     private final boolean throttleReadResponses;
 
     public BookieRequestProcessor(ServerConfiguration serverCfg, Bookie bookie, StatsLogger statsLogger,
-            SecurityHandlerFactory shFactory, ByteBufAllocator allocator) throws SecurityException {
+                                  SecurityHandlerFactory shFactory, ByteBufAllocator allocator,
+                                  ChannelGroup allChannels) throws SecurityException {
         this.serverCfg = serverCfg;
         this.allocator = allocator;
+        this.allChannels = allChannels;
         this.waitTimeoutOnBackpressureMillis = serverCfg.getWaitTimeoutOnResponseBackpressureMillis();
         this.preserveMdcForTaskExecution = serverCfg.getPreserveMdcForTaskExecution();
         this.bookie = bookie;
@@ -325,11 +331,12 @@ public class BookieRequestProcessor implements RequestProcessor {
                                 .setAuthPluginName(AuthProviderFactoryFactory.AUTHENTICATION_DISABLED_PLUGIN_NAME)
                                 .setPayload(ByteString.copyFrom(AuthToken.NULL.getData()))
                                 .build();
-                        BookkeeperProtocol.Response.Builder authResponse = BookkeeperProtocol.Response
+                        final BookkeeperProtocol.Response authResponse = BookkeeperProtocol.Response
                                 .newBuilder().setHeader(r.getHeader())
                                 .setStatus(BookkeeperProtocol.StatusCode.EOK)
-                                .setAuthResponse(message);
-                        channel.writeAndFlush(authResponse.build());
+                                .setAuthResponse(message)
+                                .build();
+                        writeAndFlush(channel, authResponse);
                         break;
                     case WRITE_LAC:
                         processWriteLacRequestV3(r, requestHandler);
@@ -348,10 +355,11 @@ public class BookieRequestProcessor implements RequestProcessor {
                         break;
                     default:
                         LOG.info("Unknown operation type {}", header.getOperation());
-                        BookkeeperProtocol.Response.Builder response =
+                        final BookkeeperProtocol.Response response =
                                 BookkeeperProtocol.Response.newBuilder().setHeader(r.getHeader())
-                                        .setStatus(BookkeeperProtocol.StatusCode.EBADREQ);
-                        channel.writeAndFlush(response.build());
+                                        .setStatus(BookkeeperProtocol.StatusCode.EBADREQ)
+                                        .build();
+                        writeAndFlush(channel, response);
                         if (statsEnabled) {
                             bkStats.getOpStats(BKStats.STATS_UNKNOWN).incrementFailedOps();
                         }
@@ -385,12 +393,15 @@ public class BookieRequestProcessor implements RequestProcessor {
                             .setPayload(ByteString.copyFrom(AuthToken.NULL.getData()))
                             .build();
 
-                    channel.writeAndFlush(new BookieProtocol.AuthResponse(
-                            BookieProtocol.CURRENT_PROTOCOL_VERSION, message));
+                    final BookieProtocol.AuthResponse response = new BookieProtocol.AuthResponse(
+                            BookieProtocol.CURRENT_PROTOCOL_VERSION, message);
+                    writeAndFlush(channel, response);
                     break;
                 default:
                     LOG.error("Unknown op type {}, sending error", r.getOpCode());
-                    channel.writeAndFlush(ResponseBuilder.buildErrorResponse(BookieProtocol.EBADREQ, r));
+                    final BookieProtocol.Response errResponse = ResponseBuilder
+                            .buildErrorResponse(BookieProtocol.EBADREQ, r);
+                    writeAndFlush(channel, errResponse);
                     if (statsEnabled) {
                         bkStats.getOpStats(BKStats.STATS_UNKNOWN).incrementFailedOps();
                     }
@@ -567,7 +578,7 @@ public class BookieRequestProcessor implements RequestProcessor {
         if (shFactory == null) {
             LOG.error("Got StartTLS request but TLS not configured");
             response.setStatus(BookkeeperProtocol.StatusCode.EBADREQ);
-            c.writeAndFlush(response.build());
+            writeAndFlush(c, response.build());
         } else {
             // there is no need to execute in a different thread as this operation is light
             SslHandler sslHandler = shFactory.newTLSHandler();
@@ -596,16 +607,18 @@ public class BookieRequestProcessor implements RequestProcessor {
                         } else {
                             LOG.error("TLS Handshake failure: ", future.cause());
                         }
-                        BookkeeperProtocol.Response.Builder errResponse = BookkeeperProtocol.Response.newBuilder()
-                                .setHeader(r.getHeader()).setStatus(BookkeeperProtocol.StatusCode.EIO);
-                        c.writeAndFlush(errResponse.build());
+                        final BookkeeperProtocol.Response errResponse = BookkeeperProtocol.Response.newBuilder()
+                                .setHeader(r.getHeader())
+                                .setStatus(BookkeeperProtocol.StatusCode.EIO)
+                                .build();
+                        writeAndFlush(c, errResponse);
                         if (statsEnabled) {
                             bkStats.getOpStats(BKStats.STATS_UNKNOWN).incrementFailedOps();
                         }
                     }
                 }
             });
-            c.writeAndFlush(response.build());
+            writeAndFlush(c, response.build());
         }
     }
 
@@ -658,6 +671,9 @@ public class BookieRequestProcessor implements RequestProcessor {
                     BookieProtocol.ETOOMANYREQUESTS,
                     ResponseBuilder.buildErrorResponse(BookieProtocol.ETOOMANYREQUESTS, r),
                     requestStats.getAddRequestStats());
+                r.release();
+                r.recycle();
+                write.recycle();
             }
         }
     }
@@ -697,6 +713,7 @@ public class BookieRequestProcessor implements RequestProcessor {
                     ResponseBuilder.buildErrorResponse(BookieProtocol.ETOOMANYREQUESTS, r),
                     requestStats.getReadRequestStats());
                 onReadRequestFinish();
+                read.recycle();
             }
         }
     }
@@ -723,5 +740,9 @@ public class BookieRequestProcessor implements RequestProcessor {
 
     public void handleNonWritableChannel(Channel channel) {
         onResponseTimeout.accept(channel);
+    }
+
+    private static void writeAndFlush(Channel channel, Object msg) {
+        NettyChannelUtil.writeAndFlushWithVoidPromise(channel, msg);
     }
 }

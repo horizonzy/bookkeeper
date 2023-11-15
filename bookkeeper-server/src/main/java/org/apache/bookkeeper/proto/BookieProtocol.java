@@ -254,58 +254,6 @@ public interface BookieProtocol {
     }
 
     /**
-     * A Request that adds data.
-     */
-    class AddRequest extends Request {
-        ByteBufList data;
-
-        static AddRequest create(byte protocolVersion, long ledgerId,
-                                 long entryId, short flags, byte[] masterKey,
-                                 ByteBufList data) {
-            AddRequest add = RECYCLER.get();
-            add.protocolVersion = protocolVersion;
-            add.opCode = ADDENTRY;
-            add.ledgerId = ledgerId;
-            add.entryId = entryId;
-            add.flags = flags;
-            add.masterKey = masterKey;
-            add.data = data.retain();
-            return add;
-        }
-
-        ByteBufList getData() {
-            // We need to have different ByteBufList instances for each bookie write
-            return ByteBufList.clone(data);
-        }
-
-        boolean isRecoveryAdd() {
-            return (flags & FLAG_RECOVERY_ADD) == FLAG_RECOVERY_ADD;
-        }
-
-        private final Handle<AddRequest> recyclerHandle;
-        private AddRequest(Handle<AddRequest> recyclerHandle) {
-            this.recyclerHandle = recyclerHandle;
-        }
-
-        private static final Recycler<AddRequest> RECYCLER = new Recycler<AddRequest>() {
-            @Override
-            protected AddRequest newObject(Handle<AddRequest> handle) {
-                return new AddRequest(handle);
-            }
-        };
-
-        @Override
-        public void recycle() {
-            ledgerId = -1;
-            entryId = -1;
-            masterKey = null;
-            ReferenceCountUtil.safeRelease(data);
-            data = null;
-            recyclerHandle.recycle(this);
-        }
-    }
-
-    /**
      * This is similar to add request, but it used when processing the request on the bookie side.
      */
     class ParsedAddRequest extends Request {
@@ -334,7 +282,7 @@ public interface BookieProtocol {
         }
 
         void release() {
-            ReferenceCountUtil.safeRelease(data);
+            ReferenceCountUtil.release(data);
         }
 
         private final Handle<ParsedAddRequest> recyclerHandle;
@@ -363,16 +311,42 @@ public interface BookieProtocol {
      * A Request that reads data.
      */
     class ReadRequest extends Request {
-        ReadRequest(byte protocolVersion, long ledgerId, long entryId,
-                    short flags, byte[] masterKey) {
-            init(protocolVersion, READENTRY, ledgerId, entryId, flags, masterKey);
-        }
 
-        public ReadRequest() {
+        static ReadRequest create(byte protocolVersion, long ledgerId, long entryId,
+                  short flags, byte[] masterKey) {
+            ReadRequest read = RECYCLER.get();
+            read.protocolVersion = protocolVersion;
+            read.opCode = READENTRY;
+            read.ledgerId = ledgerId;
+            read.entryId = entryId;
+            read.flags = flags;
+            read.masterKey = masterKey;
+            return read;
         }
 
         boolean isFencing() {
             return (flags & FLAG_DO_FENCING) == FLAG_DO_FENCING;
+        }
+
+        private final Handle<ReadRequest> recyclerHandle;
+
+        private ReadRequest(Handle<ReadRequest> recyclerHandle) {
+            this.recyclerHandle = recyclerHandle;
+        }
+
+        private static final Recycler<ReadRequest> RECYCLER = new Recycler<ReadRequest>() {
+            @Override
+            protected ReadRequest newObject(Handle<ReadRequest> handle) {
+                return new ReadRequest(handle);
+            }
+        };
+
+        @Override
+        public void recycle() {
+            ledgerId = -1;
+            entryId = -1;
+            masterKey = null;
+            recyclerHandle.recycle(this);
         }
     }
 
@@ -416,6 +390,7 @@ public interface BookieProtocol {
 
         private final Handle<BatchedReadRequest> recyclerHandle;
         private BatchedReadRequest(Handle<BatchedReadRequest> recyclerHandle) {
+            super(null);
             this.recyclerHandle = recyclerHandle;
         }
 

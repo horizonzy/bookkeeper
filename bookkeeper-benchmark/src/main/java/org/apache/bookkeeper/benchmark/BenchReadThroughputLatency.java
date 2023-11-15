@@ -163,6 +163,7 @@ public class BenchReadThroughputLatency {
         options.addOption("password", true, "Password used to access ledgers (default 'benchPasswd')");
         options.addOption("zookeeper", true, "Zookeeper ensemble, default \"localhost:2181\"");
         options.addOption("sockettimeout", true, "Socket timeout for bookkeeper client. In seconds. Default 5");
+        options.addOption("useV2", false, "Whether use V2 protocol to read ledgers from the bookie server.");
         options.addOption("help", false, "This message");
         options.addOption("batchentries", true, "");
 
@@ -202,6 +203,10 @@ public class BenchReadThroughputLatency {
         final ClientConfiguration conf = new ClientConfiguration();
         conf.setReadTimeout(sockTimeout).setZkServers(servers);
         conf.setUseV2WireProtocol(true);
+
+        if (cmd.hasOption("useV2")) {
+            conf.setUseV2WireProtocol(true);
+        }
 
         try (ZooKeeperClient zk = ZooKeeperClient.newBuilder()
                 .connectString(servers)
