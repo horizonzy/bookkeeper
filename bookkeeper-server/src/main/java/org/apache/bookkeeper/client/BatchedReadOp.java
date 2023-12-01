@@ -43,7 +43,7 @@ public class BatchedReadOp extends ReadOpBase implements BatchedReadEntryCallbac
         this.requestTimeNanos = MathUtils.nowInNano();
         List<BookieId> ensemble = getLedgerMetadata().getEnsembleAt(startEntryId);
         if (parallelRead) {
-            request = new ParallelReadRequest(ensemble, lh.ledgerId, startEntryId, maxCount, maxSize);
+            throw new UnsupportedOperationException("Batch read unsupported the parallelRead.");
         } else {
             request = new SequenceReadRequest(ensemble, lh.ledgerId, startEntryId, maxCount, maxSize);
         }
@@ -110,9 +110,6 @@ public class BatchedReadOp extends ReadOpBase implements BatchedReadEntryCallbac
         if (lh.throttler != null) {
             lh.throttler.acquire();
         }
-
-        // todo, need to handle ensumble change
-
         if (isRecoveryRead) {
             int flags = BookieProtocol.FLAG_HIGH_PRIORITY | BookieProtocol.FLAG_DO_FENCING;
             clientCtx.getBookieClient().readEntries(to, lh.ledgerId, entry.eId,
@@ -171,29 +168,13 @@ public class BatchedReadOp extends ReadOpBase implements BatchedReadEntryCallbac
                 return false;
             }
         }
-    }
-
-    class ParallelReadRequest extends BatchedLedgerEntryRequest {
-
-        ParallelReadRequest(List<BookieId> ensemble,
-                            long lId,
-                            long eId,
-                            int maxCount,
-                            long maxSize) {
-            super(ensemble, lId, eId, maxCount, maxSize);
-        }
-
+    
         @Override
-        void read() {
-
-        }
-
-        @Override
-        BookieId maybeSendSpeculativeRead(BitSet heardFromHostsBitSet) {
-            return null;
+        public String toString() {
+            return String.format("L%d-E%d~%d s-%d", lh.getId(), eId, eId + maxCount, maxSize);
         }
     }
-
+    
     class SequenceReadRequest extends BatchedLedgerEntryRequest {
 
         static final int NOT_FOUND = -1;

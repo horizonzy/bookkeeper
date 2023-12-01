@@ -800,6 +800,8 @@ public class LedgerHandle implements WriteHandle {
         if (clientCtx.getConf().batchReadFailBackToSingleRead) {
             return true;
         }
+        // TODO: 2023/12/1
+        // version compatibility
         LedgerMetadata ledgerMetadata = getLedgerMetadata();
         return ledgerMetadata.getEnsembleSize() > ledgerMetadata.getWriteQuorumSize();
     }
