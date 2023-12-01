@@ -201,6 +201,9 @@ public class ClientConfiguration extends AbstractConfiguration<ClientConfigurati
     // Logs
     protected static final String CLIENT_CONNECT_BOOKIE_UNAVAILABLE_LOG_THROTTLING =
             "clientConnectBookieUnavailableLogThrottling";
+    
+    //For batch read api, it the batch read is not stable, we can fail back to single read by this config.
+    protected static final String BATCH_READ_FAIL_BACK_TO_SINGLE_READ = "batchReadFailBackToSingleRead";
 
     /**
      * Construct a default client-side configuration.
@@ -2075,6 +2078,10 @@ public class ClientConfiguration extends AbstractConfiguration<ClientConfigurati
      */
     public long getClientConnectBookieUnavailableLogThrottlingMs() {
         return getLong(CLIENT_CONNECT_BOOKIE_UNAVAILABLE_LOG_THROTTLING, 5_000L);
+    }
+    
+    public boolean isBatchReadFailBackToSingleRead() {
+        return getBoolean(BATCH_READ_FAIL_BACK_TO_SINGLE_READ, false);
     }
 
     @Override

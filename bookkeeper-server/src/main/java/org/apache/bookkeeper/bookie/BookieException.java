@@ -95,6 +95,7 @@ public abstract class BookieException extends Exception {
         int CookieExistsException = -109;
         int EntryLogMetadataMapException = -110;
         int DataUnknownException = -111;
+        int BadRequestParameterException = -112;
     }
 
     public int getCode() {
@@ -368,4 +369,27 @@ public abstract class BookieException extends Exception {
             super(Code.DataUnknownException, reason, t);
         }
     }
+    
+    /**
+     * Signal the client request parameter is bad for bookie server.
+     */
+    public static class BadRequestParameterException extends BookieException {
+        public BadRequestParameterException() {
+            super(Code.BadRequestParameterException);
+        }
+        
+        public BadRequestParameterException(Throwable t) {
+            super(Code.BadRequestParameterException, t);
+        }
+        
+        public BadRequestParameterException(String reason) {
+            super(Code.BadRequestParameterException, reason);
+        }
+        
+        public BadRequestParameterException(String reason, Throwable t) {
+            super(Code.BadRequestParameterException, reason, t);
+        }
+    }
+    
+    
 }

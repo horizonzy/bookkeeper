@@ -109,6 +109,9 @@ class ReadEntryProcessor extends PacketProcessorBase<ReadRequest> {
                 LOG.debug("Error reading {}", request, e);
             }
             errorCode = BookieProtocol.EIO;
+        } catch (BookieException.BadRequestParameterException e) {
+            LOG.error("The request parameter is bad for bookie server, request: {}", request);
+            errorCode = BookieProtocol.EBADREQUESTPARAMETER;
         } catch (BookieException.DataUnknownException e) {
             LOG.error("Ledger {} is in an unknown state", request.getLedgerId(), e);
             errorCode = BookieProtocol.EUNKNOWNLEDGERSTATE;

@@ -790,8 +790,22 @@ public class LedgerHandle implements WriteHandle {
                     ledgerId, startEntry, lastAddConfirmed);
             return FutureUtils.exception(new BKReadException());
         }
-
+        if (failBackToSingleRead()) {
+            return failBackSingleRead(startEntry, maxCount, maxSize);
+        }
         return readEntriesInternalAsync(startEntry, maxCount, maxSize, false);
+    }
+    
+    private boolean failBackToSingleRead() {
+        if (clientCtx.getConf().batchReadFailBackToSingleRead) {
+            return true;
+        }
+        LedgerMetadata ledgerMetadata = getLedgerMetadata();
+        return ledgerMetadata.getEnsembleSize() > ledgerMetadata.getWriteQuorumSize();
+    }
+    
+    private CompletableFuture<LedgerEntries> failBackSingleRead(long startEntry, int maxCount, long maxSize) {
+        return readAsync(startEntry, startEntry + maxCount);
     }
 
     private CompletableFuture<LedgerEntries> readEntriesInternalAsync(long startEntry, int maxCount, long maxSize,

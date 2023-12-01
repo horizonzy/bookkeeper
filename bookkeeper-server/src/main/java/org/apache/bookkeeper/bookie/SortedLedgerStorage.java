@@ -225,10 +225,8 @@ public class SortedLedgerStorage
             if (null == kv) {
                 // The entry might have been flushed since we last checked, so query the ledger cache again.
                 // If the entry truly doesn't exist, then this will throw a NoEntryException
-//                System.out.printf("Read from ledger cache again %d:%d%n", ledgerId, entryId);
                 buffToRet = interleavedLedgerStorage.getEntry(ledgerId, entryId);
             } else {
-//                System.out.printf("Read from mem table %d:%d%n", ledgerId, entryId);
                 buffToRet = kv.getValueAsByteBuffer();
             }
         }

@@ -48,6 +48,7 @@ class ClientInternalConf {
     final boolean enableBookieFailureTracking;
     final boolean useV2WireProtocol;
     final boolean enforceMinNumFaultDomainsForWrite;
+    final boolean batchReadFailBackToSingleRead;
 
     static ClientInternalConf defaultValues() {
         return fromConfig(new ClientConfiguration());
@@ -72,7 +73,7 @@ class ClientInternalConf {
         this.addEntryQuorumTimeoutNanos = TimeUnit.SECONDS.toNanos(conf.getAddEntryQuorumTimeout());
         this.throttleValue = conf.getThrottleValue();
         this.bookieFailureHistoryExpirationMSec = conf.getBookieFailureHistoryExpirationMSec();
-
+        this.batchReadFailBackToSingleRead = conf.isBatchReadFailBackToSingleRead();
         this.disableEnsembleChangeFeature = featureProvider.getFeature(conf.getDisableEnsembleChangeFeatureName());
 
         this.delayEnsembleChange = conf.getDelayEnsembleChange();

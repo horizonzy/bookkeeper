@@ -1515,6 +1515,8 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
                 return StatusCode.EREADONLY;
             case BookieProtocol.ETOOMANYREQUESTS:
                 return StatusCode.ETOOMANYREQUESTS;
+            case BookieProtocol.EBADREQUESTPARAMETER:
+                return StatusCode.EBADREQUESTPARAMETER;
             default:
                 throw new IllegalArgumentException("Invalid error code: " + errorCode);
         }
@@ -2442,6 +2444,8 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
                 return BKException.Code.TooManyRequestsException;
             case EUNKNOWNLEDGERSTATE:
                 return BKException.Code.DataUnknownException;
+            case EBADREQUESTPARAMETER:
+                return BKException.Code.IncorrectParameterException;
             default:
                 return BKException.Code.UNINITIALIZED;
         }

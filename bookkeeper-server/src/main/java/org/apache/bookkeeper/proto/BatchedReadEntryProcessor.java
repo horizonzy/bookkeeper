@@ -3,22 +3,27 @@ package org.apache.bookkeeper.proto;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.Recycler;
 import io.netty.util.ReferenceCounted;
+import org.apache.bookkeeper.bookie.BookieException;
 import org.apache.bookkeeper.proto.BookieProtocol.BatchedReadRequest;
 import org.apache.bookkeeper.util.ByteBufList;
 
 import java.util.concurrent.ExecutorService;
 
 class BatchedReadEntryProcessor extends ReadEntryProcessor {
+    
+    private long nettyMaxFrameSizeBytes;
 
     public static BatchedReadEntryProcessor create(BatchedReadRequest request,
                                             BookieRequestHandler requestHandler,
                                             BookieRequestProcessor requestProcessor,
                                             ExecutorService fenceThreadPool,
-                                            boolean throttleReadResponses) {
+                                            boolean throttleReadResponses,
+                                            int nettyMaxFrameSizeBytes) {
         BatchedReadEntryProcessor rep = RECYCLER.get();
         rep.init(request, requestHandler, requestProcessor);
         rep.fenceThreadPool = fenceThreadPool;
         rep.throttleReadResponses = throttleReadResponses;
+        rep.nettyMaxFrameSizeBytes = nettyMaxFrameSizeBytes;
         requestProcessor.onReadRequestStart(requestHandler.ctx().channel());
         return rep;
     }
@@ -27,9 +32,13 @@ class BatchedReadEntryProcessor extends ReadEntryProcessor {
     protected ReferenceCounted readData() throws Exception {
         // need to handle the max frame size
         ByteBufList data = null;
-//        System.out.println(String.format("Batched read request %s, %d", request.toString(), ((BatchedReadRequest) request).getMaxCount()));
-        for (int i = 0; i < ((BatchedReadRequest) request).getMaxCount(); i++) {
-//            System.out.printf(String.format("Read individual entry %d", request.entryId + i));
+        BatchedReadRequest batchRequest = (BatchedReadRequest) request;
+        long maxSize = batchRequest.getMaxSize();
+        if (maxSize > nettyMaxFrameSizeBytes) {
+            throw new BookieException.BadRequestParameterException();
+        }
+        long entrySize = 0;
+        for (int i = 0; i < batchRequest.getMaxCount(); i++) {
             try {
                 ByteBuf entry = requestProcessor.getBookie().readEntry(request.getLedgerId(), request.getEntryId() + i);
                 if (data == null) {
@@ -37,13 +46,17 @@ class BatchedReadEntryProcessor extends ReadEntryProcessor {
                 } else {
                     data.add(entry);
                 }
-            } catch (Throwable e) {
-                // todo, should return the existing data to the client
-                // Release the readed data if there are failed read request.
-                if (data != null) {
-                    data.release();
+                if (maxSize > 0) {
+                    entrySize += entry.readableBytes();
+                    if (entrySize > maxSize) {
+                        break;
+                    }
                 }
-                throw e;
+            } catch (Throwable e) {
+                if (data == null) {
+                    throw e;
+                }
+                break;
             }
         }
         return data;

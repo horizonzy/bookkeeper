@@ -60,7 +60,17 @@ public interface ReadHandle extends Handle {
         return FutureUtils.<LedgerEntries, BKException>result(readAsync(firstEntry, lastEntry),
                                                               BKException.HANDLER);
     }
-
+    
+    /**
+     *
+     * @param startEntry
+     *          start entry id
+     * @param maxCount
+     *          the total entry count.
+     * @param maxSize
+     *          the total entry size.
+     * @return the result of the operation
+     */
     default LedgerEntries read(long startEntry, int maxCount, long maxSize) throws BKException, InterruptedException {
         return FutureUtils.result(readAsync(startEntry, maxCount, maxSize),
                 BKException.HANDLER);
