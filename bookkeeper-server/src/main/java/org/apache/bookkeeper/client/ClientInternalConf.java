@@ -49,6 +49,7 @@ class ClientInternalConf {
     final boolean useV2WireProtocol;
     final boolean enforceMinNumFaultDomainsForWrite;
     final boolean batchReadFailBackToSingleRead;
+    final int nettyMaxFrameSizeBytes;
 
     static ClientInternalConf defaultValues() {
         return fromConfig(new ClientConfiguration());
@@ -74,8 +75,8 @@ class ClientInternalConf {
         this.throttleValue = conf.getThrottleValue();
         this.bookieFailureHistoryExpirationMSec = conf.getBookieFailureHistoryExpirationMSec();
         this.batchReadFailBackToSingleRead = conf.isBatchReadFailBackToSingleRead();
+        this.nettyMaxFrameSizeBytes = conf.getNettyMaxFrameSizeBytes();
         this.disableEnsembleChangeFeature = featureProvider.getFeature(conf.getDisableEnsembleChangeFeatureName());
-
         this.delayEnsembleChange = conf.getDelayEnsembleChange();
         this.maxAllowedEnsembleChanges = conf.getMaxAllowedEnsembleChanges();
         this.timeoutMonitorIntervalSec = conf.getTimeoutMonitorIntervalSec();

@@ -683,7 +683,7 @@ public class BookieRequestProcessor implements RequestProcessor {
                 null == highPriorityThreadPool ? null : highPriorityThreadPool.chooseThread(requestHandler.ctx());
         ReadEntryProcessor read = r instanceof BookieProtocol.BatchedReadRequest
                 ? BatchedReadEntryProcessor.create((BookieProtocol.BatchedReadRequest) r, requestHandler,
-                this, fenceThreadPool, throttleReadResponses, serverCfg.getNettyMaxFrameSizeBytes())
+                this, fenceThreadPool, throttleReadResponses)
                 : ReadEntryProcessor.create(r, requestHandler,
                 this, fenceThreadPool, throttleReadResponses);
 

@@ -812,6 +812,11 @@ public class LedgerHandle implements WriteHandle {
 
     private CompletableFuture<LedgerEntries> readEntriesInternalAsync(long startEntry, int maxCount, long maxSize,
                                                                       boolean isRecoveryRead) {
+        if (maxSize > clientCtx.getConf().nettyMaxFrameSizeBytes) {
+            LOG.error("IncorrectParameterException on batch read. maxSize:{} is greater than nettyMaxFrameSizeBytes:{}",
+                    maxSize, clientCtx.getConf().nettyMaxFrameSizeBytes);
+            return FutureUtils.exception(new BKIncorrectParameterException());
+        }
         BatchedReadOp op = new BatchedReadOp(this, clientCtx,
                 startEntry, maxCount, maxSize, isRecoveryRead);
         if (!clientCtx.isClientClosed()) {

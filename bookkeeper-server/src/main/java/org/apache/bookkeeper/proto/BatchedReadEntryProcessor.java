@@ -3,7 +3,7 @@ package org.apache.bookkeeper.proto;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.Recycler;
 import io.netty.util.ReferenceCounted;
-import org.apache.bookkeeper.bookie.BookieException;
+import org.apache.bookkeeper.bookie.Bookie;
 import org.apache.bookkeeper.proto.BookieProtocol.BatchedReadRequest;
 import org.apache.bookkeeper.util.ByteBufList;
 
@@ -11,35 +11,32 @@ import java.util.concurrent.ExecutorService;
 
 class BatchedReadEntryProcessor extends ReadEntryProcessor {
     
-    private long nettyMaxFrameSizeBytes;
-
+    boolean rejust = Boolean.getBoolean("aaa");
+    
     public static BatchedReadEntryProcessor create(BatchedReadRequest request,
                                             BookieRequestHandler requestHandler,
                                             BookieRequestProcessor requestProcessor,
                                             ExecutorService fenceThreadPool,
-                                            boolean throttleReadResponses,
-                                            int nettyMaxFrameSizeBytes) {
+                                            boolean throttleReadResponses) {
         BatchedReadEntryProcessor rep = RECYCLER.get();
         rep.init(request, requestHandler, requestProcessor);
         rep.fenceThreadPool = fenceThreadPool;
         rep.throttleReadResponses = throttleReadResponses;
-        rep.nettyMaxFrameSizeBytes = nettyMaxFrameSizeBytes;
         requestProcessor.onReadRequestStart(requestHandler.ctx().channel());
         return rep;
     }
 
     @Override
     protected ReferenceCounted readData() throws Exception {
-        // need to handle the max frame size
         ByteBufList data = null;
         BatchedReadRequest batchRequest = (BatchedReadRequest) request;
         long maxSize = batchRequest.getMaxSize();
-        if (maxSize > nettyMaxFrameSizeBytes) {
-            throw new BookieException.BadRequestParameterException();
-        }
         long entrySize = 0;
         for (int i = 0; i < batchRequest.getMaxCount(); i++) {
             try {
+                if (rejust && i == 0) {
+                    throw new Bookie.NoEntryException(39, 0);
+                }
                 ByteBuf entry = requestProcessor.getBookie().readEntry(request.getLedgerId(), request.getEntryId() + i);
                 if (data == null) {
                     data = ByteBufList.get(entry);
