@@ -103,6 +103,7 @@ public class LedgerHandle implements WriteHandle {
     final long ledgerId;
     final ExecutorService executor;
     long lastAddPushed;
+    boolean notSupportBatch;
 
     private enum HandleState {
         OPEN,
@@ -713,8 +714,22 @@ public class LedgerHandle implements WriteHandle {
             cb.readComplete(BKException.Code.ReadException, this, null, ctx);
             return;
         }
-
-        asyncReadEntriesInternal(firstEntry, maxCount, maxSize, cb, ctx, false);
+        if (isFailBackToSingleRead()) {
+            asyncReadEntries(firstEntry, firstEntry + maxCount - 1, cb, ctx);
+        } else {
+            asyncReadEntriesInternal(firstEntry, maxCount, maxSize, new ReadCallback() {
+                @Override
+                public void readComplete(int rc, LedgerHandle lh, Enumeration<LedgerEntry> seq, Object ctx) {
+                    //not compatible
+                    if (rc == Code.ProtocolVersionException) {
+                        notSupportBatch = true;
+                        asyncReadEntries(firstEntry, firstEntry + maxCount - 1, cb, ctx);
+                    } else {
+                        cb.readComplete(rc, lh, seq, ctx);
+                    }
+                }
+            }, ctx, false);
+        }
     }
 
     /**
@@ -790,26 +805,43 @@ public class LedgerHandle implements WriteHandle {
                     ledgerId, startEntry, lastAddConfirmed);
             return FutureUtils.exception(new BKReadException());
         }
-        if (failBackToSingleRead()) {
-            return failBackSingleRead(startEntry, maxCount, maxSize);
+        if (isFailBackToSingleRead()) {
+            return readAsync(startEntry, startEntry + maxCount - 1);
         }
-        return readEntriesInternalAsync(startEntry, maxCount, maxSize, false);
+        CompletableFuture<LedgerEntries> future = new CompletableFuture<>();
+        readEntriesInternalAsync(startEntry, maxCount, maxSize, false)
+                .whenComplete((entries, ex) -> {
+                    if (ex != null) {
+                        if (ex instanceof BKException.BKProtocolVersionException) {
+                            notSupportBatch = true;
+                            readAsync(startEntry, startEntry + maxCount - 1).whenComplete((entries1, ex1) -> {
+                                if (ex1 != null) {
+                                    future.completeExceptionally(ex1);
+                                } else {
+                                    future.complete(entries1);
+                                }
+                            });
+                        } else {
+                            future.completeExceptionally(ex);
+                        }
+                    } else {
+                        future.complete(entries);
+                    }
+                });
+        return future;
     }
     
-    private boolean failBackToSingleRead() {
+    private boolean isFailBackToSingleRead() {
         if (clientCtx.getConf().batchReadFailBackToSingleRead) {
             return true;
         }
-        // TODO: 2023/12/1
-        // version compatibility
+        if (notSupportBatch) {
+            return true;
+        }
         LedgerMetadata ledgerMetadata = getLedgerMetadata();
         return ledgerMetadata.getEnsembleSize() > ledgerMetadata.getWriteQuorumSize();
     }
     
-    private CompletableFuture<LedgerEntries> failBackSingleRead(long startEntry, int maxCount, long maxSize) {
-        return readAsync(startEntry, startEntry + maxCount);
-    }
-
     private CompletableFuture<LedgerEntries> readEntriesInternalAsync(long startEntry, int maxCount, long maxSize,
                                                                       boolean isRecoveryRead) {
         if (maxSize > clientCtx.getConf().nettyMaxFrameSizeBytes) {

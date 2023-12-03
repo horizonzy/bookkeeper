@@ -3,15 +3,12 @@ package org.apache.bookkeeper.proto;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.Recycler;
 import io.netty.util.ReferenceCounted;
-import org.apache.bookkeeper.bookie.Bookie;
 import org.apache.bookkeeper.proto.BookieProtocol.BatchedReadRequest;
 import org.apache.bookkeeper.util.ByteBufList;
 
 import java.util.concurrent.ExecutorService;
 
 class BatchedReadEntryProcessor extends ReadEntryProcessor {
-    
-    boolean rejust = Boolean.getBoolean("aaa");
     
     public static BatchedReadEntryProcessor create(BatchedReadRequest request,
                                             BookieRequestHandler requestHandler,
@@ -34,9 +31,6 @@ class BatchedReadEntryProcessor extends ReadEntryProcessor {
         long entrySize = 0;
         for (int i = 0; i < batchRequest.getMaxCount(); i++) {
             try {
-                if (rejust && i == 0) {
-                    throw new Bookie.NoEntryException(39, 0);
-                }
                 ByteBuf entry = requestProcessor.getBookie().readEntry(request.getLedgerId(), request.getEntryId() + i);
                 if (data == null) {
                     data = ByteBufList.get(entry);

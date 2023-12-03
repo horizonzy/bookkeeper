@@ -78,7 +78,7 @@ public abstract class ReadOpBase implements Runnable {
 
     abstract protected void submitCallback(int code);
 
-    abstract class LedgerEntryRequest implements SpeculativeRequestExecutor, AutoCloseable {
+    abstract class LedgerEntryRequest implements SpeculativeRequestExecutor {
 
         final AtomicBoolean complete = new AtomicBoolean(false);
 
@@ -106,7 +106,6 @@ public abstract class ReadOpBase implements Runnable {
             }
         }
 
-        @Override
         public void close() {
             // this request has succeeded before, can't recycle writeSet again
             if (complete.compareAndSet(false, true)) {
@@ -130,6 +129,7 @@ public abstract class ReadOpBase implements Runnable {
         boolean fail(int rc) {
             if (complete.compareAndSet(false, true)) {
                 this.rc = rc;
+                writeSet.recycle();
                 submitCallback(rc);
                 return true;
             } else {

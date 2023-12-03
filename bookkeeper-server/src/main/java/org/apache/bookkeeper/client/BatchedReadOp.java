@@ -266,14 +266,16 @@ public class BatchedReadOp extends ReadOpBase implements BatchedReadEntryCallbac
         @Override
         synchronized void logErrorAndReattemptRead(int bookieIndex, BookieId host, String errMsg, int rc) {
             super.logErrorAndReattemptRead(bookieIndex, host, errMsg, rc);
-
+            if (rc == BKException.Code.ProtocolVersionException) {
+                fail(rc);
+                return;
+            }
             int replica = writeSet.indexOf(bookieIndex);
             if (replica == NOT_FOUND) {
                 LOG.error("Received error from a host which is not in the ensemble {} {}.", host, ensemble);
                 return;
             }
             erroredReplicas.set(replica);
-
             if (isRecoveryRead && (numBookiesMissingEntry >= requiredBookiesMissingEntryForRecovery)) {
                 /* For recovery, report NoSuchEntry as soon as wQ-aQ+1 bookies report that they do not
                  * have the entry */
