@@ -720,8 +720,7 @@ public class LedgerHandle implements WriteHandle {
             asyncReadEntriesInternal(firstEntry, maxCount, maxSize, new ReadCallback() {
                 @Override
                 public void readComplete(int rc, LedgerHandle lh, Enumeration<LedgerEntry> seq, Object ctx) {
-                    //not compatible
-                    if (rc == Code.ProtocolVersionException) {
+                    if (rc == Code.BookieHandleNotAvailableException) {
                         notSupportBatch = true;
                         asyncReadEntries(firstEntry, firstEntry + maxCount - 1, cb, ctx);
                     } else {
@@ -812,7 +811,7 @@ public class LedgerHandle implements WriteHandle {
         readEntriesInternalAsync(startEntry, maxCount, maxSize, false)
                 .whenComplete((entries, ex) -> {
                     if (ex != null) {
-                        if (ex instanceof BKException.BKProtocolVersionException) {
+                        if (ex instanceof BKException.BKBookieHandleNotAvailableException) {
                             notSupportBatch = true;
                             readAsync(startEntry, startEntry + maxCount - 1).whenComplete((entries1, ex1) -> {
                                 if (ex1 != null) {

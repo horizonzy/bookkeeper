@@ -1034,8 +1034,8 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
                                      int flags,
                                      byte[] masterKey,
                                      boolean allowFastFail) {
-        Object request = null;
-        CompletionKey completionKey = null;
+        Object request;
+        CompletionKey completionKey;
         final long txnId = getTxnId();
         if (useV2WireProtocol) {
             request = BookieProtocol.BatchedReadRequest.create(BookieProtocol.CURRENT_PROTOCOL_VERSION,

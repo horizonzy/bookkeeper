@@ -266,7 +266,7 @@ public class BatchedReadOp extends ReadOpBase implements BatchedReadEntryCallbac
         @Override
         synchronized void logErrorAndReattemptRead(int bookieIndex, BookieId host, String errMsg, int rc) {
             super.logErrorAndReattemptRead(bookieIndex, host, errMsg, rc);
-            if (rc == BKException.Code.ProtocolVersionException) {
+            if (rc == BKException.Code.BookieHandleNotAvailableException) {
                 fail(rc);
                 return;
             }
