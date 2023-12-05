@@ -236,7 +236,7 @@ public class BatchedReadOp extends ReadOpBase implements BatchedReadEntryCallbac
         }
 
         @Override
-        BookieId maybeSendSpeculativeRead(BitSet heardFrom) {
+        synchronized BookieId maybeSendSpeculativeRead(BitSet heardFrom) {
             if (nextReplicaIndexToReadFrom >= getLedgerMetadata().getWriteQuorumSize()) {
                 return null;
             }
