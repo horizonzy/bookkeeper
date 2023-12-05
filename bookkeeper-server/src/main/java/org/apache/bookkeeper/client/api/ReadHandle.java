@@ -60,7 +60,7 @@ public interface ReadHandle extends Handle {
         return FutureUtils.<LedgerEntries, BKException>result(readAsync(firstEntry, lastEntry),
                                                               BKException.HANDLER);
     }
-    
+
     /**
      *
      * @param startEntry

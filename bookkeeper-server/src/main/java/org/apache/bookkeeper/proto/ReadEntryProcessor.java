@@ -19,8 +19,8 @@ package org.apache.bookkeeper.proto;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.util.Recycler;
-import io.netty.util.ReferenceCounted;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.ReferenceCounted;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;

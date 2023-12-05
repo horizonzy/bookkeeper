@@ -22,8 +22,6 @@
 package org.apache.bookkeeper.proto;
 
 import io.netty.buffer.ByteBuf;
-
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;

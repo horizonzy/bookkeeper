@@ -21,12 +21,6 @@
 package org.apache.bookkeeper.client;
 
 import com.google.common.util.concurrent.ListenableFuture;
-import org.apache.bookkeeper.client.api.LedgerEntries;
-import org.apache.bookkeeper.client.api.LedgerMetadata;
-import org.apache.bookkeeper.net.BookieId;
-import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import java.util.BitSet;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +28,12 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.bookkeeper.client.api.LedgerEntries;
+import org.apache.bookkeeper.client.api.LedgerMetadata;
+import org.apache.bookkeeper.net.BookieId;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public abstract class ReadOpBase implements Runnable {
 
@@ -95,8 +95,8 @@ public abstract class ReadOpBase implements Runnable {
     }
 
     abstract void initiate();
-
-    abstract protected void submitCallback(int code);
+    
+    protected abstract void submitCallback(int code);
 
     abstract class LedgerEntryRequest implements SpeculativeRequestExecutor {
 

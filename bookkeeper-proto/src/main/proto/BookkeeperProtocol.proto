@@ -117,25 +117,6 @@ message ReadRequest {
     optional int64 timeOut = 5;
 }
 
-message BatchReadRequest {
-    enum Flag {
-        FENCE_LEDGER = 1;
-        ENTRY_PIGGYBACK = 2;
-    }
-    optional Flag flag = 100;
-    required int64 ledgerId = 1;
-    // entryId will be -1 for reading the LAST_ADD_CONFIRMED entry.
-    required int64 startEntryId = 2;
-    required int32 maxCount = 3;
-    required int64 maxSize = 4;
-    // Used while fencing a ledger.
-    optional bytes masterKey = 5;
-    // Used for waiting on last add confirmed update
-    optional int64 previousLAC = 6;
-    // Used as a timeout (in milliseconds) for the long polling request
-    optional int64 timeOut = 7;
-}
-
 message AddRequest {
     enum Flag {
         RECOVERY_ADD = 1;
@@ -202,16 +183,6 @@ message ReadResponse {
     required int64 ledgerId = 2;
     required int64 entryId = 3;
     optional bytes body = 4;
-    // Piggyback LAC
-    optional int64 maxLAC = 5;
-    optional int64 lacUpdateTimestamp = 6;
-}
-
-message BatchReadResponse {
-    required StatusCode status = 1;
-    required int64 ledgerId = 2;
-    required int64 startEntryId = 3;
-    repeated bytes body = 4;
     // Piggyback LAC
     optional int64 maxLAC = 5;
     optional int64 lacUpdateTimestamp = 6;

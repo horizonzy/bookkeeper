@@ -2376,7 +2376,7 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
 
     class TxnCompletionKey extends CompletionKey {
         final long txnId;
-    
+
         public TxnCompletionKey(long txnId, OperationType operationType) {
             super(operationType);
             this.txnId = txnId;

@@ -21,6 +21,10 @@
 package org.apache.bookkeeper.client;
 
 import io.netty.buffer.ByteBuf;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.bookkeeper.client.api.LedgerEntry;
 import org.apache.bookkeeper.client.impl.LedgerEntriesImpl;
 import org.apache.bookkeeper.client.impl.LedgerEntryImpl;
@@ -32,11 +36,6 @@ import org.apache.bookkeeper.util.ByteBufList;
 import org.apache.bookkeeper.util.MathUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 public class BatchedReadOp extends ReadOpBase implements BatchedReadEntryCallback {
 
@@ -168,7 +167,8 @@ public class BatchedReadOp extends ReadOpBase implements BatchedReadEntryCallbac
                         content = lh.macManager.verifyDigestAndReturnData(eId + i, buffer);
                     } catch (BKException.BKDigestMatchException e) {
                         clientCtx.getClientStats().getReadOpDmCounter().inc();
-                        logErrorAndReattemptRead(bookieIndex, host, "Mac mismatch", BKException.Code.DigestMatchException);
+                        logErrorAndReattemptRead(bookieIndex, host, "Mac mismatch",
+                                BKException.Code.DigestMatchException);
                         return false;
                     }
                     rc = BKException.Code.OK;
@@ -188,13 +188,13 @@ public class BatchedReadOp extends ReadOpBase implements BatchedReadEntryCallbac
                 return false;
             }
         }
-    
+
         @Override
         public String toString() {
             return String.format("L%d-E%d~%d s-%d", lh.getId(), eId, eId + maxCount, maxSize);
         }
     }
-    
+
     class SequenceReadRequest extends BatchedLedgerEntryRequest {
 
         static final int NOT_FOUND = -1;

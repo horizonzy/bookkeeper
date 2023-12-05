@@ -829,7 +829,7 @@ public class LedgerHandle implements WriteHandle {
                 });
         return future;
     }
-    
+
     private boolean isFailBackToSingleRead() {
         if (clientCtx.getConf().batchReadFailBackToSingleRead) {
             return true;
@@ -840,7 +840,7 @@ public class LedgerHandle implements WriteHandle {
         LedgerMetadata ledgerMetadata = getLedgerMetadata();
         return ledgerMetadata.getEnsembleSize() > ledgerMetadata.getWriteQuorumSize();
     }
-    
+
     private CompletableFuture<LedgerEntries> readEntriesInternalAsync(long startEntry, int maxCount, long maxSize,
                                                                       boolean isRecoveryRead) {
         if (maxSize > clientCtx.getConf().nettyMaxFrameSizeBytes) {

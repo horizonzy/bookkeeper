@@ -23,10 +23,9 @@ package org.apache.bookkeeper.proto;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.Recycler;
 import io.netty.util.ReferenceCounted;
+import java.util.concurrent.ExecutorService;
 import org.apache.bookkeeper.proto.BookieProtocol.BatchedReadRequest;
 import org.apache.bookkeeper.util.ByteBufList;
-
-import java.util.concurrent.ExecutorService;
 
 class BatchedReadEntryProcessor extends ReadEntryProcessor {
     
