@@ -95,7 +95,7 @@ public abstract class ReadOpBase implements Runnable {
     }
 
     abstract void initiate();
-    
+
     protected abstract void submitCallback(int code);
 
     abstract class LedgerEntryRequest implements SpeculativeRequestExecutor {

@@ -28,7 +28,7 @@ import org.apache.bookkeeper.proto.BookieProtocol.BatchedReadRequest;
 import org.apache.bookkeeper.util.ByteBufList;
 
 class BatchedReadEntryProcessor extends ReadEntryProcessor {
-    
+
     public static BatchedReadEntryProcessor create(BatchedReadRequest request,
                                             BookieRequestHandler requestHandler,
                                             BookieRequestProcessor requestProcessor,
