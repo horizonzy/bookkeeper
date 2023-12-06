@@ -715,7 +715,7 @@ public class LedgerHandle implements WriteHandle {
             return;
         }
         if (isFailBackToSingleRead()) {
-            asyncReadEntries(firstEntry, firstEntry + maxCount - 1, cb, ctx);
+            asyncReadEntriesInternal(firstEntry, firstEntry + maxCount - 1, cb, ctx, false);
         } else {
             asyncReadEntriesInternal(firstEntry, maxCount, maxSize, new ReadCallback() {
                 @Override
@@ -805,7 +805,7 @@ public class LedgerHandle implements WriteHandle {
             return FutureUtils.exception(new BKReadException());
         }
         if (isFailBackToSingleRead()) {
-            return readAsync(startEntry, startEntry + maxCount - 1);
+            return readEntriesInternalAsync(startEntry, startEntry + maxCount - 1, false);
         }
         CompletableFuture<LedgerEntries> future = new CompletableFuture<>();
         readEntriesInternalAsync(startEntry, maxCount, maxSize, false)
@@ -843,6 +843,11 @@ public class LedgerHandle implements WriteHandle {
 
     private CompletableFuture<LedgerEntries> readEntriesInternalAsync(long startEntry, int maxCount, long maxSize,
                                                                       boolean isRecoveryRead) {
+        if (maxCount <= 0 || maxSize <= 0) {
+            LOG.error("IncorrectParameterException on batch read. maxCount:{} or maxSize:{} is negative.", maxCount,
+                    maxSize);
+            return FutureUtils.exception(new BKIncorrectParameterException());
+        }
         if (maxSize > clientCtx.getConf().nettyMaxFrameSizeBytes) {
             LOG.error("IncorrectParameterException on batch read. maxSize:{} is greater than nettyMaxFrameSizeBytes:{}",
                     maxSize, clientCtx.getConf().nettyMaxFrameSizeBytes);
