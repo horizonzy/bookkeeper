@@ -25,10 +25,12 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import java.io.File;
 import java.io.IOException;
@@ -59,6 +61,8 @@ import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GetBookieInfoCall
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.ReadEntryCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.WriteCallback;
 import org.apache.bookkeeper.proto.BookkeeperProtocol;
+import org.apache.bookkeeper.proto.DataFormats;
+import org.apache.bookkeeper.proto.checksum.DigestManager;
 import org.apache.bookkeeper.stats.NullStatsLogger;
 import org.apache.bookkeeper.test.TestStatsProvider.TestOpStatsLogger;
 import org.apache.bookkeeper.test.TestStatsProvider.TestStatsLogger;
@@ -358,28 +362,57 @@ public class BookieClientTest {
         BookieClient bc = new BookieClientImpl(conf, eventLoopGroup,
                 UnpooledByteBufAllocator.DEFAULT, executor, scheduler, NullStatsLogger.INSTANCE,
                 BookieSocketAddress.LEGACY_BOOKIEID_RESOLVER);
-        ByteBufList bb = createByteBuffer(1, 1, 1);
+    
         BookieId addr = bs.getBookieId();
         byte[] passwd = new byte[20];
         Arrays.fill(passwd, (byte) 'a');
-        ResultStruct arc = new ResultStruct();
-
+        DigestManager digestManager = DigestManager.instantiate(1, passwd,
+                DataFormats.LedgerMetadataFormat.DigestType.CRC32C, ByteBufAllocator.DEFAULT, true);
+        byte[] masterKey = DigestManager.generateMasterKey(passwd);
+    
         final int entries = 10;
+        int length = 0;
         for (int i = 0; i < entries; i++) {
-            bc.addEntry(addr, 1, passwd, i, bb, wrcb, arc, BookieProtocol.FLAG_NONE, false, WriteFlag.NONE);
+            ByteBuf bb = Unpooled.buffer(4);
+            bb.writeInt(i);
+            length += 4;
+            ReferenceCounted content = digestManager.computeDigestAndPackageForSending(i, i - 1, length, bb,
+                    masterKey, BookieProtocol.FLAG_NONE);
+            ResultStruct arc = new ResultStruct();
+            bc.addEntry(addr, 1, passwd, i, content, wrcb, arc, BookieProtocol.FLAG_NONE, false, WriteFlag.NONE);
+            Awaitility.await().untilAsserted(() -> {
+                assertEquals(0, arc.rc);
+            });
         }
         AtomicReference<ByteBufList> result = new AtomicReference<>();
-        Awaitility.await().untilAsserted(() -> {
-            assertEquals(0, arc.rc);
-        });
-
-        bc.readEntries(addr, 1, 1, 5, -1, (rc, ledgerId, startEntryId, bufList, ctx) -> {
+        
+        bc.readEntries(addr, 1, 0, 5, -1, (rc, ledgerId, startEntryId, bufList, ctx) -> {
             result.set(bufList);
         }, null, BookieProtocol.FLAG_NONE);
 
         Awaitility.await().untilAsserted(() -> {
-            assertNotNull(result.get());
-            assertEquals(result.get().size(), 5);
+            ByteBufList byteBufList = result.get();
+            assertNotNull(byteBufList);
         });
+        ByteBufList byteBufList = result.get();
+        assertEquals(5, byteBufList.size());
+        for (int i = 0; i < byteBufList.size(); i++) {
+            ByteBuf buffer = byteBufList.getBuffer(i);
+            //ledgerId
+            assertEquals(1, buffer.readLong());
+            //entryId
+            assertEquals(i, buffer.readLong());
+            //lac
+            assertEquals(i - 1, buffer.readLong());
+            //length
+            assertEquals((i + 1) * 4, buffer.readLong());
+            //digest
+            int i1 = buffer.readInt();
+            //data
+            ByteBuf byteBuf = buffer.readBytes(buffer.readableBytes());
+            assertEquals(i, byteBuf.readInt());
+        }
     }
+    
+    
 }
