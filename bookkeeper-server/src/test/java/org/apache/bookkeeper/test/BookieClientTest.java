@@ -362,14 +362,14 @@ public class BookieClientTest {
         BookieClient bc = new BookieClientImpl(conf, eventLoopGroup,
                 UnpooledByteBufAllocator.DEFAULT, executor, scheduler, NullStatsLogger.INSTANCE,
                 BookieSocketAddress.LEGACY_BOOKIEID_RESOLVER);
-    
+
         BookieId addr = bs.getBookieId();
         byte[] passwd = new byte[20];
         Arrays.fill(passwd, (byte) 'a');
         DigestManager digestManager = DigestManager.instantiate(1, passwd,
                 DataFormats.LedgerMetadataFormat.DigestType.CRC32C, ByteBufAllocator.DEFAULT, true);
         byte[] masterKey = DigestManager.generateMasterKey(passwd);
-    
+
         final int entries = 10;
         int length = 0;
         for (int i = 0; i < entries; i++) {
@@ -385,7 +385,7 @@ public class BookieClientTest {
             });
         }
         AtomicReference<ByteBufList> result = new AtomicReference<>();
-        
+
         bc.readEntries(addr, 1, 0, 5, -1, (rc, ledgerId, startEntryId, bufList, ctx) -> {
             result.set(bufList);
         }, null, BookieProtocol.FLAG_NONE);
@@ -413,6 +413,4 @@ public class BookieClientTest {
             assertEquals(i, byteBuf.readInt());
         }
     }
-    
-    
 }
