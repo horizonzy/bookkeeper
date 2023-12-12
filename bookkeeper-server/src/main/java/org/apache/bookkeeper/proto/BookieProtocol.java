@@ -610,11 +610,6 @@ public interface BookieProtocol {
         public boolean release(int decrement) {
             return data.release(decrement);
         }
-    
-        @Override
-        void recycle() {
-            super.recycle();
-        }
     }
 
     /**

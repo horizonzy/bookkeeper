@@ -42,7 +42,6 @@ import org.apache.bookkeeper.proto.BookkeeperProtocol.OperationType;
 import org.apache.bookkeeper.proto.BookkeeperProtocol.Response;
 import org.apache.bookkeeper.proto.checksum.MacDigestManager;
 import org.apache.bookkeeper.util.ByteBufList;
-import org.apache.http.cookie.SM;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -305,7 +304,7 @@ public class BookieProtoEncoding {
                     int payloadSize = brr.getData().readableBytes();
                     int delimiterSize = brr.getData().size() * 4; // The size of each entry.
                     boolean isSmallEntry = (payloadSize + delimiterSize) < SMALL_ENTRY_SIZE_THRESHOLD;
-    
+
                     int responseSize = RESPONSE_HEADERS_SIZE + 8 /* request_id */ + payloadSize + delimiterSize;
                     int bufferSize = 4 /* frame size */ + responseSize;
                     ByteBuf buf = allocator.buffer(bufferSize);
