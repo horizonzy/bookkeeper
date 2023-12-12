@@ -102,7 +102,7 @@ public class BenchReadThroughputLatency {
                 }
                 long starttime = System.nanoTime();
 
-                while (entriesRead <= 1000000) {
+                while (entriesRead <= lastConfirmed) {
                     long nextLimit = lastRead + 100000;
                     Enumeration<LedgerEntry> entries;
                     if (batchEntries <= 0) {
@@ -165,7 +165,8 @@ public class BenchReadThroughputLatency {
         options.addOption("sockettimeout", true, "Socket timeout for bookkeeper client. In seconds. Default 5");
         options.addOption("useV2", false, "Whether use V2 protocol to read ledgers from the bookie server.");
         options.addOption("help", false, "This message");
-        options.addOption("batchentries", true, "");
+        options.addOption("batchentries", true, "The batch read entries count. "
+                + "If the value is greater than 0, uses batch read. Or uses the single read. Default 1000");
 
         CommandLineParser parser = new PosixParser();
         CommandLine cmd = parser.parse(options, args);
@@ -202,7 +203,6 @@ public class BenchReadThroughputLatency {
 
         final ClientConfiguration conf = new ClientConfiguration();
         conf.setReadTimeout(sockTimeout).setZkServers(servers);
-        conf.setUseV2WireProtocol(true);
 
         if (cmd.hasOption("useV2")) {
             conf.setUseV2WireProtocol(true);

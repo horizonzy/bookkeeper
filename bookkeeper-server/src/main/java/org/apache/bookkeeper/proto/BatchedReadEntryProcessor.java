@@ -23,6 +23,8 @@ package org.apache.bookkeeper.proto;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.Recycler;
 import io.netty.util.ReferenceCounted;
+
+import java.security.InvalidParameterException;
 import java.util.concurrent.ExecutorService;
 import org.apache.bookkeeper.proto.BookieProtocol.BatchedReadRequest;
 import org.apache.bookkeeper.util.ByteBufList;
@@ -46,21 +48,25 @@ class BatchedReadEntryProcessor extends ReadEntryProcessor {
     protected ReferenceCounted readData() throws Exception {
         ByteBufList data = null;
         BatchedReadRequest batchRequest = (BatchedReadRequest) request;
+        int maxCount = batchRequest.getMaxCount();
+        if (maxCount <= 0) {
+            maxCount = Integer.MAX_VALUE;
+        }
         long maxSize = batchRequest.getMaxSize();
-        long entrySize = 0;
-        for (int i = 0; i < batchRequest.getMaxCount(); i++) {
+        //See BookieProtoEncoding.ResponseEnDeCoderPreV3#encode on BatchedReadResponse case.
+        long frameSize = 24 + 8 + 4;
+        for (int i = 0; i < maxCount; i++) {
             try {
                 ByteBuf entry = requestProcessor.getBookie().readEntry(request.getLedgerId(), request.getEntryId() + i);
+                frameSize += entry.readableBytes() + 4;
                 if (data == null) {
                     data = ByteBufList.get(entry);
                 } else {
-                    data.add(entry);
-                }
-                if (maxSize > 0) {
-                    entrySize += entry.readableBytes();
-                    if (entrySize > maxSize) {
+                    if (frameSize > maxSize) {
+                        entry.release();
                         break;
                     }
+                    data.add(entry);
                 }
             } catch (Throwable e) {
                 if (data == null) {
@@ -78,8 +84,11 @@ class BatchedReadEntryProcessor extends ReadEntryProcessor {
     }
 
     protected void recycle() {
+        request.recycle();
         super.reset();
-        this.recyclerHandle.recycle(this);
+        if (this.recyclerHandle != null) {
+            this.recyclerHandle.recycle(this);
+        }
     }
 
     private final Recycler.Handle<BatchedReadEntryProcessor> recyclerHandle;

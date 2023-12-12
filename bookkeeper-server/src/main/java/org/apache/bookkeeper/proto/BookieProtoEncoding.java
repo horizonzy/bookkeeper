@@ -42,6 +42,7 @@ import org.apache.bookkeeper.proto.BookkeeperProtocol.OperationType;
 import org.apache.bookkeeper.proto.BookkeeperProtocol.Response;
 import org.apache.bookkeeper.proto.checksum.MacDigestManager;
 import org.apache.bookkeeper.util.ByteBufList;
+import org.apache.http.cookie.SM;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -132,6 +133,7 @@ public class BookieProtoEncoding {
                 if (r.hasMasterKey()) {
                     buf.writeBytes(r.getMasterKey(), 0, BookieProtocol.MASTER_KEY_LENGTH);
                 }
+                r.recycle();
                 return buf;
             } else if (r instanceof BookieProtocol.ReadRequest) {
                 int totalHeaderSize = 4 // for request type
@@ -302,6 +304,8 @@ public class BookieProtoEncoding {
                     BookieProtocol.BatchedReadResponse brr = (BookieProtocol.BatchedReadResponse) r;
                     int payloadSize = brr.getData().readableBytes();
                     int delimiterSize = brr.getData().size() * 4; // The size of each entry.
+                    boolean isSmallEntry = (payloadSize + delimiterSize) < SMALL_ENTRY_SIZE_THRESHOLD;
+    
                     int responseSize = RESPONSE_HEADERS_SIZE + 8 /* request_id */ + payloadSize + delimiterSize;
                     int bufferSize = 4 /* frame size */ + responseSize;
                     ByteBuf buf = allocator.buffer(bufferSize);
@@ -311,13 +315,25 @@ public class BookieProtoEncoding {
                     buf.writeLong(r.getLedgerId());
                     buf.writeLong(r.getEntryId());
                     buf.writeLong(((BookieProtocol.BatchedReadResponse) r).getRequestId());
-                    for (int i = 0; i < brr.getData().size(); i++) {
-                        ByteBuf entryData = brr.getData().getBuffer(i);
-                        buf.writeInt(entryData.readableBytes());
-                        buf.writeBytes(entryData);
+                    if (isSmallEntry) {
+                        for (int i = 0; i < brr.getData().size(); i++) {
+                            ByteBuf entryData = brr.getData().getBuffer(i);
+                            buf.writeInt(entryData.readableBytes());
+                            buf.writeBytes(entryData);
+                        }
+                        brr.release();
+                        return buf;
+                    } else {
+                        ByteBufList byteBufList = ByteBufList.get(buf);
+                        for (int i = 0; i < brr.getData().size(); i++) {
+                            ByteBuf entryData = brr.getData().getBuffer(i);
+                            ByteBuf entryLengthBuf = allocator.buffer(4);
+                            entryLengthBuf.writeInt(entryData.readableBytes());
+                            byteBufList.add(entryLengthBuf);
+                            byteBufList.add(entryData);
+                        }
+                        return byteBufList;
                     }
-                    brr.release();
-                    return buf;
                 } else if (msg instanceof BookieProtocol.AddResponse) {
                     ByteBuf buf = allocator.buffer(RESPONSE_HEADERS_SIZE + 4 /* frame size */);
                     buf.writeInt(RESPONSE_HEADERS_SIZE);
@@ -375,10 +391,13 @@ public class BookieProtoEncoding {
                 ByteBufList data = null;
                 while (buffer.readableBytes() > 0) {
                     int entrySize = buffer.readInt();
+                    int entryPos = buffer.readerIndex();
                     if (data == null) {
-                        data = ByteBufList.get(buffer.readBytes(entrySize));
+                        data = ByteBufList.get(buffer.retainedSlice(entryPos, entrySize));
+                        buffer.readerIndex(entryPos + entrySize);
                     } else {
-                        data.add(buffer.readBytes(entrySize));
+                        data.add(buffer.retainedSlice(entryPos, entrySize));
+                        buffer.readerIndex(entryPos + entrySize);
                     }
                 }
                 return new BookieProtocol.BatchedReadResponse(version, rc, ledgerId, entryId, requestId, data == null

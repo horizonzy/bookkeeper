@@ -715,14 +715,16 @@ public class LedgerHandle implements WriteHandle {
             return;
         }
         if (isFailBackToSingleRead()) {
-            asyncReadEntriesInternal(firstEntry, firstEntry + maxCount - 1, cb, ctx, false);
+            long lastEntry = Math.min(firstEntry + maxCount - 1, lastAddConfirmed);
+            asyncReadEntriesInternal(firstEntry, lastEntry, cb, ctx, false);
         } else {
             asyncReadEntriesInternal(firstEntry, maxCount, maxSize, new ReadCallback() {
                 @Override
                 public void readComplete(int rc, LedgerHandle lh, Enumeration<LedgerEntry> seq, Object ctx) {
                     if (rc == Code.BookieHandleNotAvailableException) {
                         notSupportBatch = true;
-                        asyncReadEntries(firstEntry, firstEntry + maxCount - 1, cb, ctx);
+                        long lastEntry = Math.min(firstEntry + maxCount - 1, lastAddConfirmed);
+                        asyncReadEntriesInternal(firstEntry, lastEntry, cb, ctx, false);
                     } else {
                         cb.readComplete(rc, lh, seq, ctx);
                     }
@@ -805,7 +807,8 @@ public class LedgerHandle implements WriteHandle {
             return FutureUtils.exception(new BKReadException());
         }
         if (isFailBackToSingleRead()) {
-            return readEntriesInternalAsync(startEntry, startEntry + maxCount - 1, false);
+            long lastEntry = Math.min(startEntry + maxCount - 1, lastAddConfirmed);
+            return readEntriesInternalAsync(startEntry, lastEntry, false);
         }
         CompletableFuture<LedgerEntries> future = new CompletableFuture<>();
         readEntriesInternalAsync(startEntry, maxCount, maxSize, false)
@@ -813,7 +816,8 @@ public class LedgerHandle implements WriteHandle {
                     if (ex != null) {
                         if (ex instanceof BKException.BKBookieHandleNotAvailableException) {
                             notSupportBatch = true;
-                            readAsync(startEntry, startEntry + maxCount - 1).whenComplete((entries1, ex1) -> {
+                            long lastEntry = Math.min(startEntry + maxCount - 1, lastAddConfirmed);
+                            readEntriesInternalAsync(startEntry, lastEntry, false).whenComplete((entries1, ex1) -> {
                                 if (ex1 != null) {
                                     future.completeExceptionally(ex1);
                                 } else {
@@ -831,27 +835,24 @@ public class LedgerHandle implements WriteHandle {
     }
 
     private boolean isFailBackToSingleRead() {
-        if (clientCtx.getConf().batchReadFailBackToSingleRead) {
+        if (!clientCtx.getConf().batchReadEnabled) {
             return true;
         }
         if (notSupportBatch) {
             return true;
         }
         LedgerMetadata ledgerMetadata = getLedgerMetadata();
-        return ledgerMetadata.getEnsembleSize() > ledgerMetadata.getWriteQuorumSize();
+        return ledgerMetadata.getEnsembleSize() != ledgerMetadata.getWriteQuorumSize();
     }
 
     private CompletableFuture<LedgerEntries> readEntriesInternalAsync(long startEntry, int maxCount, long maxSize,
                                                                       boolean isRecoveryRead) {
-        if (maxCount <= 0) {
-            LOG.error("IncorrectParameterException on batch read. maxCount:{} is negative.", maxCount);
-            return FutureUtils.exception(new BKIncorrectParameterException());
-        }
         int nettyMaxFrameSizeBytes = clientCtx.getConf().nettyMaxFrameSizeBytes;
         if (maxSize > nettyMaxFrameSizeBytes) {
-            LOG.error("IncorrectParameterException on batch read. maxSize:{} is greater than nettyMaxFrameSizeBytes:{}",
-                    maxSize, nettyMaxFrameSizeBytes);
-            return FutureUtils.exception(new BKIncorrectParameterException());
+            LOG.info(
+                    "The max size is greater than nettyMaxFrameSizeBytes, use nettyMaxFrameSizeBytes:{} to replace it.",
+                    nettyMaxFrameSizeBytes);
+            maxSize = nettyMaxFrameSizeBytes;
         }
         if (maxSize <= 0) {
             LOG.info("The max size is negative, use nettyMaxFrameSizeBytes:{} to replace it.", nettyMaxFrameSizeBytes);

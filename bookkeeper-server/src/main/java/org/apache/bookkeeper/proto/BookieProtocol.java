@@ -346,7 +346,9 @@ public interface BookieProtocol {
             ledgerId = -1;
             entryId = -1;
             masterKey = null;
-            recyclerHandle.recycle(this);
+            if (recyclerHandle != null) {
+                recyclerHandle.recycle(this);
+            }
         }
     }
 
@@ -409,7 +411,9 @@ public interface BookieProtocol {
             maxCount = -1;
             maxSize = -1;
             requestId = -1;
-            recyclerHandle.recycle(this);
+            if (recyclerHandle != null) {
+                recyclerHandle.recycle(this);
+            }
         }
     }
 
@@ -605,6 +609,11 @@ public interface BookieProtocol {
         @Override
         public boolean release(int decrement) {
             return data.release(decrement);
+        }
+    
+        @Override
+        void recycle() {
+            super.recycle();
         }
     }
 

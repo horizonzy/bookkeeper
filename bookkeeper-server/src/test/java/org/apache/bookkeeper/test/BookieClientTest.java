@@ -386,7 +386,7 @@ public class BookieClientTest {
         }
         AtomicReference<ByteBufList> result = new AtomicReference<>();
 
-        bc.readEntries(addr, 1, 0, 5, -1, (rc, ledgerId, startEntryId, bufList, ctx) -> {
+        bc.readEntries(addr, 1, 0, 5, 5 * 1024 * 1024, (rc, ledgerId, startEntryId, bufList, ctx) -> {
             result.set(bufList);
         }, null, BookieProtocol.FLAG_NONE);
 
