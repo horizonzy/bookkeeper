@@ -133,13 +133,12 @@ public class BookieProtoEncodingTest {
         v2ReqEncoder.decode((ByteBuf) v3ReqEncoder.encode(v3Req, UnpooledByteBufAllocator.DEFAULT));
     }
 
-    @Test()
+    @Test
     public void testV2BatchReadRequest() throws Exception {
         RequestEnDeCoderPreV3 v2ReqEncoder = new RequestEnDeCoderPreV3(registry);
         BookieProtocol.BatchedReadRequest req = BookieProtocol.BatchedReadRequest.create(
                 BookieProtocol.CURRENT_PROTOCOL_VERSION, 1L, 1L, FLAG_NONE, null, 1L, 10, 1024L);
         ByteBuf buf = (ByteBuf) v2ReqEncoder.encode(req, UnpooledByteBufAllocator.DEFAULT);
-        req.recycle();
         buf.readInt(); // Skip the frame size.
         BookieProtocol.BatchedReadRequest reqDecoded = (BookieProtocol.BatchedReadRequest) v2ReqEncoder.decode(buf);
         assertEquals(req.ledgerId, reqDecoded.ledgerId);
