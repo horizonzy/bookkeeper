@@ -29,15 +29,19 @@ import org.apache.bookkeeper.util.ByteBufList;
 
 class BatchedReadEntryProcessor extends ReadEntryProcessor {
 
+    private long maxBatchReadSize;
+
     public static BatchedReadEntryProcessor create(BatchedReadRequest request,
                                             BookieRequestHandler requestHandler,
                                             BookieRequestProcessor requestProcessor,
                                             ExecutorService fenceThreadPool,
-                                            boolean throttleReadResponses) {
+                                            boolean throttleReadResponses,
+                                            long maxBatchReadSize) {
         BatchedReadEntryProcessor rep = RECYCLER.get();
         rep.init(request, requestHandler, requestProcessor);
         rep.fenceThreadPool = fenceThreadPool;
         rep.throttleReadResponses = throttleReadResponses;
+        rep.maxBatchReadSize = maxBatchReadSize;
         requestProcessor.onReadRequestStart(requestHandler.ctx().channel());
         return rep;
     }
@@ -50,7 +54,7 @@ class BatchedReadEntryProcessor extends ReadEntryProcessor {
         if (maxCount <= 0) {
             maxCount = Integer.MAX_VALUE;
         }
-        long maxSize = batchRequest.getMaxSize();
+        long maxSize = Math.min(batchRequest.getMaxSize(), maxBatchReadSize);
         //See BookieProtoEncoding.ResponseEnDeCoderPreV3#encode on BatchedReadResponse case.
         long frameSize = 24 + 8 + 4;
         for (int i = 0; i < maxCount; i++) {
