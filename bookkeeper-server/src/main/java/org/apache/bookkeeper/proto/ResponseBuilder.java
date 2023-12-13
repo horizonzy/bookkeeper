@@ -21,7 +21,6 @@
 package org.apache.bookkeeper.proto;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import org.apache.bookkeeper.util.ByteBufList;
 
 class ResponseBuilder {
