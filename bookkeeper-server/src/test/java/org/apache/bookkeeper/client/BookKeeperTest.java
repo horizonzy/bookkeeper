@@ -576,7 +576,7 @@ public class BookKeeperTest extends BookKeeperClusterTestCase {
             // basic read/write
             {
                 long ledgerId;
-                try (LedgerHandle lh = bkc.createLedger(1, 1, digestType, "testPasswd".getBytes())) {
+                try (LedgerHandle lh = bkc.createLedger(digestType, "testPasswd".getBytes())) {
                     ledgerId = lh.getId();
                     for (int i = 0; i < numEntries; i++) {
                         lh.addEntry(data);
@@ -584,7 +584,7 @@ public class BookKeeperTest extends BookKeeperClusterTestCase {
                 }
                 try (LedgerHandle lh = bkc.openLedger(ledgerId, digestType, "testPasswd".getBytes())) {
                     assertEquals(numEntries - 1, lh.readLastConfirmed());
-                    for (Enumeration<LedgerEntry> readEntries = lh.readEntries(0, numEntries, -1);
+                    for (Enumeration<LedgerEntry> readEntries = lh.readEntries(0, numEntries - 1);
                         readEntries.hasMoreElements();) {
                         LedgerEntry entry = readEntries.nextElement();
                         assertArrayEquals(data, entry.getEntry());

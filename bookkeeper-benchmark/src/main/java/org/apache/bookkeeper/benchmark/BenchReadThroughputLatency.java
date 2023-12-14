@@ -126,7 +126,6 @@ public class BenchReadThroughputLatency {
                 lh.close();
                 lh = null;
                 Thread.sleep(1000);
-                break;
             }
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();

@@ -688,7 +688,7 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
     void writeLac(final long ledgerId, final byte[] masterKey, final long lac, ByteBufList toSend, WriteLacCallback cb,
             Object ctx) {
         final long txnId = getTxnId();
-        final CompletionKey completionKey = new V3CompletionKey(txnId,
+        final CompletionKey completionKey = new TxnCompletionKey(txnId,
                                                                 OperationType.WRITE_LAC);
         // writeLac is mostly like addEntry hence uses addEntryTimeout
         completionObjects.put(completionKey,
@@ -730,7 +730,7 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
                 return;
         }
         final long txnId = getTxnId();
-        final CompletionKey completionKey = new V3CompletionKey(txnId,
+        final CompletionKey completionKey = new TxnCompletionKey(txnId,
                                                                 OperationType.FORCE_LEDGER);
         // force is mostly like addEntry hence uses addEntryTimeout
         completionObjects.put(completionKey,
@@ -792,7 +792,7 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
             }
         } else {
             final long txnId = getTxnId();
-            completionKey = new V3CompletionKey(txnId, OperationType.ADD_ENTRY);
+            completionKey = new TxnCompletionKey(txnId, OperationType.ADD_ENTRY);
 
             // Build the request and calculate the total size to be included in the packet.
             BKPacketHeader.Builder headerBuilder = BKPacketHeader.newBuilder()
@@ -862,7 +862,7 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
             completionKey = acquireV2Key(ledgerId, 0, OperationType.READ_LAC);
         } else {
             final long txnId = getTxnId();
-            completionKey = new V3CompletionKey(txnId, OperationType.READ_LAC);
+            completionKey = new TxnCompletionKey(txnId, OperationType.READ_LAC);
 
             // Build the request and calculate the total size to be included in the packet.
             BKPacketHeader.Builder headerBuilder = BKPacketHeader.newBuilder()
@@ -884,7 +884,7 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
 
     public void getListOfEntriesOfLedger(final long ledgerId, GetListOfEntriesOfLedgerCallback cb) {
         final long txnId = getTxnId();
-        final CompletionKey completionKey = new V3CompletionKey(txnId, OperationType.GET_LIST_OF_ENTRIES_OF_LEDGER);
+        final CompletionKey completionKey = new TxnCompletionKey(txnId, OperationType.GET_LIST_OF_ENTRIES_OF_LEDGER);
         completionObjects.put(completionKey, new GetListOfEntriesOfLedgerCompletion(completionKey, cb, ledgerId));
 
         // Build the request.
@@ -946,7 +946,7 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
             completionKey = acquireV2Key(ledgerId, entryId, OperationType.READ_ENTRY);
         } else {
             final long txnId = getTxnId();
-            completionKey = new V3CompletionKey(txnId, OperationType.READ_ENTRY);
+            completionKey = new TxnCompletionKey(txnId, OperationType.READ_ENTRY);
 
             // Build the request and calculate the total size to be included in the packet.
             BKPacketHeader.Builder headerBuilder = BKPacketHeader.newBuilder()
@@ -1040,7 +1040,7 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
         if (useV2WireProtocol) {
             request = BookieProtocol.BatchedReadRequest.create(BookieProtocol.CURRENT_PROTOCOL_VERSION,
                     ledgerId, startEntryId, (short) flags, masterKey, txnId, maxCount, maxSize);
-            completionKey = new V3CompletionKey(txnId, OperationType.BATCH_READ_ENTRY);
+            completionKey = new TxnCompletionKey(txnId, OperationType.BATCH_READ_ENTRY);
         } else {
             throw new UnsupportedOperationException("Unsupported batch read entry operation for v3 protocol.");
         }
@@ -1053,7 +1053,7 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
 
     public void getBookieInfo(final long requested, GetBookieInfoCallback cb, Object ctx) {
         final long txnId = getTxnId();
-        final CompletionKey completionKey = new V3CompletionKey(txnId, OperationType.GET_BOOKIE_INFO);
+        final CompletionKey completionKey = new TxnCompletionKey(txnId, OperationType.GET_BOOKIE_INFO);
         completionObjects.put(completionKey,
                               new GetBookieInfoCompletion(
                                       completionKey, cb, ctx));
@@ -1401,7 +1401,7 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
 
         CompletionKey key;
         if (OperationType.BATCH_READ_ENTRY == operationType) {
-            key = new V3CompletionKey(((BookieProtocol.BatchedReadResponse) response).getRequestId(), operationType);
+            key = new TxnCompletionKey(((BookieProtocol.BatchedReadResponse) response).getRequestId(), operationType);
         } else {
             key = acquireV2Key(response.ledgerId, response.entryId, operationType);
         }
@@ -2371,21 +2371,23 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
 
     // visable for testing
     CompletionKey newCompletionKey(long txnId, OperationType operationType) {
-        return new V3CompletionKey(txnId, operationType);
+        return new TxnCompletionKey(txnId, operationType);
     }
 
-    class V3CompletionKey extends CompletionKey {
+    class TxnCompletionKey extends CompletionKey {
+        final long txnId;
 
-        public V3CompletionKey(long txnId, OperationType operationType) {
-            super(txnId, operationType);
+        public TxnCompletionKey(long txnId, OperationType operationType) {
+            super(operationType);
+            this.txnId = txnId;
         }
 
         @Override
         public boolean equals(Object obj) {
-            if (!(obj instanceof V3CompletionKey)) {
+            if (!(obj instanceof TxnCompletionKey)) {
                 return false;
             }
-            V3CompletionKey that = (V3CompletionKey) obj;
+            TxnCompletionKey that = (TxnCompletionKey) obj;
             return this.txnId == that.txnId && this.operationType == that.operationType;
         }
 
@@ -2402,12 +2404,9 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
     }
 
     abstract class CompletionKey {
-        final long txnId;
         OperationType operationType;
 
-        CompletionKey(long txnId,
-                      OperationType operationType) {
-            this.txnId = txnId;
+        CompletionKey(OperationType operationType) {
             this.operationType = operationType;
         }
 
@@ -2468,28 +2467,28 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
         return txnIdGenerator.incrementAndGet();
     }
 
-    private final Recycler<V2CompletionKey> v2KeyRecycler = new Recycler<V2CompletionKey>() {
+    private final Recycler<EntryCompletionKey> v2KeyRecycler = new Recycler<EntryCompletionKey>() {
             @Override
-            protected V2CompletionKey newObject(
-                    Recycler.Handle<V2CompletionKey> handle) {
-                return new V2CompletionKey(handle);
+            protected EntryCompletionKey newObject(
+                    Recycler.Handle<EntryCompletionKey> handle) {
+                return new EntryCompletionKey(handle);
             }
         };
 
-    V2CompletionKey acquireV2Key(long ledgerId, long entryId,
+    EntryCompletionKey acquireV2Key(long ledgerId, long entryId,
                              OperationType operationType) {
-        V2CompletionKey key = v2KeyRecycler.get();
+        EntryCompletionKey key = v2KeyRecycler.get();
         key.reset(ledgerId, entryId, operationType);
         return key;
     }
 
-    private class V2CompletionKey extends CompletionKey {
-        private final Handle<V2CompletionKey> recyclerHandle;
+    private class EntryCompletionKey extends CompletionKey {
+        private final Handle<EntryCompletionKey> recyclerHandle;
         long ledgerId;
         long entryId;
 
-        private V2CompletionKey(Handle<V2CompletionKey> handle) {
-            super(-1, null);
+        private EntryCompletionKey(Handle<EntryCompletionKey> handle) {
+            super(null);
             this.recyclerHandle = handle;
         }
 
@@ -2501,10 +2500,10 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
 
         @Override
         public boolean equals(Object object) {
-            if (!(object instanceof V2CompletionKey)) {
+            if (!(object instanceof EntryCompletionKey)) {
                 return  false;
             }
-            V2CompletionKey that = (V2CompletionKey) object;
+            EntryCompletionKey that = (EntryCompletionKey) object;
             return this.entryId == that.entryId
                 && this.ledgerId == that.ledgerId
                 && this.operationType == that.operationType;
@@ -2692,7 +2691,7 @@ public class PerChannelBookieClient extends ChannelInboundHandlerAdapter {
         LOG.info("Initializing TLS to {}", channel);
         assert state == ConnectionState.CONNECTING;
         final long txnId = getTxnId();
-        final CompletionKey completionKey = new V3CompletionKey(txnId, OperationType.START_TLS);
+        final CompletionKey completionKey = new TxnCompletionKey(txnId, OperationType.START_TLS);
         completionObjects.put(completionKey,
                               new StartTLSCompletion(completionKey));
         BookkeeperProtocol.Request.Builder h = withRequestContext(BookkeeperProtocol.Request.newBuilder());
