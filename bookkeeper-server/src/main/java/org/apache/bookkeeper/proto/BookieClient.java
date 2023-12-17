@@ -162,18 +162,18 @@ public interface BookieClient {
         readEntry(address, ledgerId, entryId, cb, ctx, flags, masterKey, false);
     }
 
-    default void readEntries(BookieId address, long ledgerId, long startEntryId,
+    default void batchReadEntries(BookieId address, long ledgerId, long firstEntry,
                              int maxCount, long maxSize, BatchedReadEntryCallback cb, Object ctx,
                              int flags) {
-        readEntries(address, ledgerId, startEntryId, maxCount, maxSize, cb, ctx, flags, null);
+        batchReadEntries(address, ledgerId, firstEntry, maxCount, maxSize, cb, ctx, flags, null);
     }
-    default void readEntries(BookieId address, long ledgerId, long startEntryId,
+    default void batchReadEntries(BookieId address, long ledgerId, long firstEntry,
                              int maxCount, long maxSize, BatchedReadEntryCallback cb, Object ctx,
                              int flags, byte[] masterKey) {
-        readEntries(address, ledgerId, startEntryId, maxCount, maxSize, cb, ctx, flags, masterKey, false);
+        batchReadEntries(address, ledgerId, firstEntry, maxCount, maxSize, cb, ctx, flags, masterKey, false);
     }
 
-    void readEntries(BookieId address, long ledgerId, long startEntryId,
+    void batchReadEntries(BookieId address, long ledgerId, long startEntryId,
                              int maxCount, long maxSize, BatchedReadEntryCallback cb, Object ctx,
                              int flags, byte[] masterKey, boolean allowFastFail);
 

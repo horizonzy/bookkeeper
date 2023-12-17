@@ -390,7 +390,7 @@ public class BookieClientTest {
         AtomicReference<ByteBufList> result = new AtomicReference<>();
         AtomicInteger resCode = new AtomicInteger();
 
-        bc.readEntries(addr, 1, 0, 5, 5 * 1024 * 1024, (rc, ledgerId, startEntryId, bufList, ctx) -> {
+        bc.batchReadEntries(addr, 1, 0, 5, 5 * 1024 * 1024, (rc, ledgerId, startEntryId, bufList, ctx) -> {
             resCode.set(rc);
             result.set(bufList);
         }, null, BookieProtocol.FLAG_NONE);
@@ -456,7 +456,7 @@ public class BookieClientTest {
         AtomicReference<ByteBufList> result = new AtomicReference<>();
         AtomicInteger resCode = new AtomicInteger();
 
-        bc.readEntries(addr, 1, 0, 5, 5 * 1024 * 1024, (rc, ledgerId, startEntryId, bufList, ctx) -> {
+        bc.batchReadEntries(addr, 1, 0, 5, 5 * 1024 * 1024, (rc, ledgerId, startEntryId, bufList, ctx) -> {
             resCode.set(rc);
             result.set(bufList);
         }, null, BookieProtocol.FLAG_NONE);
@@ -522,7 +522,7 @@ public class BookieClientTest {
         AtomicReference<ByteBufList> result = new AtomicReference<>();
         AtomicInteger resCode = new AtomicInteger();
 
-        bc.readEntries(addr, 1, 0, 5, 5 * 1024 * 1024, (rc, ledgerId, startEntryId, bufList, ctx) -> {
+        bc.batchReadEntries(addr, 1, 0, 5, 5 * 1024 * 1024, (rc, ledgerId, startEntryId, bufList, ctx) -> {
             resCode.set(rc);
             result.set(bufList);
         }, null, BookieProtocol.FLAG_NONE);
@@ -572,7 +572,7 @@ public class BookieClientTest {
         AtomicReference<ByteBufList> result = new AtomicReference<>();
         AtomicInteger resCode = new AtomicInteger();
 
-        bc.readEntries(addr, 1, 0, 20, 5 * 1024 * 1024, (rc, ledgerId, startEntryId, bufList, ctx) -> {
+        bc.batchReadEntries(addr, 1, 0, 20, 5 * 1024 * 1024, (rc, ledgerId, startEntryId, bufList, ctx) -> {
             result.set(bufList);
             resCode.set(rc);
         }, null, BookieProtocol.FLAG_NONE);

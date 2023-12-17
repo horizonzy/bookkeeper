@@ -642,11 +642,12 @@ public class LedgerHandle implements WriteHandle {
         return SyncCallbackUtils.waitForResult(result);
     }
 
-    public Enumeration<LedgerEntry> readEntries(long firstEntry, int maxCount, long maxSize)
+    public Enumeration<LedgerEntry> batchReadEntries(long firstEntry, int maxCount, long maxSize,
+            boolean failbackToSingleRead)
             throws InterruptedException, BKException {
         CompletableFuture<Enumeration<LedgerEntry>> result = new CompletableFuture<>();
 
-        asyncReadEntries(firstEntry, maxCount, maxSize, new SyncReadCallback(result), null);
+        asyncBatchReadEntries(firstEntry, maxCount, maxSize, failbackToSingleRead, new SyncReadCallback(result), null);
 
         return SyncCallbackUtils.waitForResult(result);
     }
@@ -672,6 +673,29 @@ public class LedgerHandle implements WriteHandle {
 
         asyncReadUnconfirmedEntries(firstEntry, lastEntry, new SyncReadCallback(result), null);
 
+        return SyncCallbackUtils.waitForResult(result);
+    }
+    
+    /**
+     * Read a sequence of entries synchronously, allowing to read after the LastAddConfirmed range.<br>
+     * This is the same of
+     * {@link #asyncBatchReadUnconfirmedEntries(long, int, long, boolean, ReadCallback, Object) }
+     *
+     * @param firstEntry
+     *          id of first entry of sequence (included)
+     * @param maxCount
+     *          id of last entry of sequence (included)
+     * @param maxSize
+     *
+     * @param failbackToSingleRead
+     *
+     */
+    public Enumeration<LedgerEntry> batchReadUnconfirmedEntries(long firstEntry, int maxCount, long maxSize, boolean failbackToSingleRead)
+            throws InterruptedException, BKException {
+        CompletableFuture<Enumeration<LedgerEntry>> result = new CompletableFuture<>();
+        
+        asyncBatchReadUnconfirmedEntries(firstEntry, maxCount, maxSize, failbackToSingleRead, new SyncReadCallback(result), null);
+        
         return SyncCallbackUtils.waitForResult(result);
     }
 
@@ -706,7 +730,26 @@ public class LedgerHandle implements WriteHandle {
         asyncReadEntriesInternal(firstEntry, lastEntry, cb, ctx, false);
     }
 
-    public void asyncReadEntries(long firstEntry, int maxCount, long maxSize, ReadCallback cb, Object ctx) {
+    /**
+     * Read a sequence of entries in asynchronously.
+     * It's not same with {@link #asyncReadEntries(long, long, ReadCallback, Object) }
+     * It send an RPC to get all entries instead of send multi RPC to get all entries.
+     *
+     * @param firstEntry
+     *          id of first entry of sequence
+     * @param maxCount
+     *          the entries count
+     * @param maxSize
+     *          the total entries size
+     * @param failbackToSingleRead
+     *          failback to {@link #asyncReadEntries(long, long, ReadCallback, Object) }
+     * @param cb
+     *          object implementing read callback interface
+     * @param ctx
+     *          control object
+     */
+    public void asyncBatchReadEntries(long firstEntry, int maxCount, long maxSize, boolean failbackToSingleRead,
+            ReadCallback cb, Object ctx) {
         // Little sanity check
         if (firstEntry > lastAddConfirmed) {
             LOG.error("ReadEntries exception on ledgerId:{} firstEntry:{} lastAddConfirmed:{}",
@@ -714,17 +757,26 @@ public class LedgerHandle implements WriteHandle {
             cb.readComplete(BKException.Code.ReadException, this, null, ctx);
             return;
         }
-        if (isFailBackToSingleRead()) {
-            long lastEntry = Math.min(firstEntry + maxCount - 1, lastAddConfirmed);
-            asyncReadEntriesInternal(firstEntry, lastEntry, cb, ctx, false);
+        if (notSupportBatchRead()) {
+            if (failbackToSingleRead) {
+                long lastEntry = Math.min(firstEntry + maxCount - 1, lastAddConfirmed);
+                asyncReadEntriesInternal(firstEntry, lastEntry, cb, ctx, false);
+            } else {
+                LOG.error("Not support batch read not.");
+                cb.readComplete(BKException.Code.ReadException, this, null, ctx);
+            }
         } else {
-            asyncReadEntriesInternal(firstEntry, maxCount, maxSize, new ReadCallback() {
+            asyncBatchReadEntriesInternal(firstEntry, maxCount, maxSize, new ReadCallback() {
                 @Override
                 public void readComplete(int rc, LedgerHandle lh, Enumeration<LedgerEntry> seq, Object ctx) {
                     if (rc == Code.BookieHandleNotAvailableException) {
                         notSupportBatch = true;
-                        long lastEntry = Math.min(firstEntry + maxCount - 1, lastAddConfirmed);
-                        asyncReadEntriesInternal(firstEntry, lastEntry, cb, ctx, false);
+                        if (failbackToSingleRead) {
+                            long lastEntry = Math.min(firstEntry + maxCount - 1, lastAddConfirmed);
+                            asyncReadEntriesInternal(firstEntry, lastEntry, cb, ctx, false);
+                        } else {
+                            cb.readComplete(rc, lh, seq, ctx);
+                        }
                     } else {
                         cb.readComplete(rc, lh, seq, ctx);
                     }
@@ -773,6 +825,58 @@ public class LedgerHandle implements WriteHandle {
     }
 
     /**
+     * Read a sequence of entries asynchronously, allowing to read after the LastAddConfirmed range.
+     * This is not same with {@link #asyncReadUnconfirmedEntries(long, long, ReadCallback, Object)}
+     * It send an RPC to get all entries instead of send multi RPC to get all entries.
+     * @param firstEntry
+     *          id of first entry of sequence
+     * @param maxCount
+     *          the entries count
+     * @param maxSize
+     *          the total entries size
+     * @param failbackToSingleRead
+     *          failback to {@link #asyncReadUnconfirmedEntries(long, long, ReadCallback, Object)}
+     * @param cb
+     *          object implementing read callback interface
+     * @param ctx
+     *          control object
+     */
+    public void asyncBatchReadUnconfirmedEntries(long firstEntry, int maxCount, long maxSize, boolean failbackToSingleRead,
+            ReadCallback cb, Object ctx) {
+        // Little sanity check
+        if (firstEntry < 0) {
+            LOG.error("IncorrectParameterException on ledgerId:{} firstEntry:{}", ledgerId, firstEntry);
+            cb.readComplete(BKException.Code.IncorrectParameterException, this, null, ctx);
+        }
+        if (notSupportBatchRead()) {
+            if (failbackToSingleRead) {
+                long lastEntry = firstEntry + maxCount - 1;
+                asyncReadEntriesInternal(firstEntry, lastEntry, cb, ctx, false);
+            } else {
+                LOG.error("Not support batch read not.");
+                cb.readComplete(BKException.Code.ReadException, this, null, ctx);
+            }
+        } else {
+            asyncBatchReadEntriesInternal(firstEntry, maxCount, maxSize, new ReadCallback() {
+                @Override
+                public void readComplete(int rc, LedgerHandle lh, Enumeration<LedgerEntry> seq, Object ctx) {
+                    if (rc == Code.BookieHandleNotAvailableException) {
+                        notSupportBatch = true;
+                        if (failbackToSingleRead) {
+                            long lastEntry = firstEntry + maxCount - 1;
+                            asyncReadEntriesInternal(firstEntry, lastEntry, cb, ctx, false);
+                        } else {
+                            cb.readComplete(rc, lh, seq, ctx);
+                        }
+                    } else {
+                        cb.readComplete(rc, lh, seq, ctx);
+                    }
+                }
+            }, ctx, false);
+        }
+    }
+
+    /**
      * Read a sequence of entries asynchronously.
      *
      * @param firstEntry
@@ -797,27 +901,46 @@ public class LedgerHandle implements WriteHandle {
 
         return readEntriesInternalAsync(firstEntry, lastEntry, false);
     }
-
+    
+    /**
+     * Read a sequence of entries in asynchronously.
+     * It's not same with {@link #readAsync(long, long) }
+     * It send an RPC to get all entries instead of send multi RPC to get all entries.
+     *
+     * @param firstEntry
+     *          id of first entry of sequence
+     * @param maxCount
+     *          the entries count
+     * @param maxSize
+     *          the total entries size
+     * @param failbackToSingleRead
+     *          failback to {@link #readAsync(long, long) }
+     */
     @Override
-    public CompletableFuture<LedgerEntries> readAsync(long startEntry, int maxCount, long maxSize) {
+    public CompletableFuture<LedgerEntries> batchReadAsync(long firstEntry, int maxCount, long maxSize,
+            boolean failbackToSingleRead) {
         // Little sanity check
-        if (startEntry > lastAddConfirmed) {
+        if (firstEntry < 0) {
+            LOG.error("IncorrectParameterException on ledgerId:{} firstEntry:{}", ledgerId, firstEntry);
+            return FutureUtils.exception(new BKIncorrectParameterException());
+        }
+        if (firstEntry > lastAddConfirmed) {
             LOG.error("ReadAsync exception on ledgerId:{} firstEntry:{} lastAddConfirmed:{}",
-                    ledgerId, startEntry, lastAddConfirmed);
+                    ledgerId, firstEntry, lastAddConfirmed);
             return FutureUtils.exception(new BKReadException());
         }
-        if (isFailBackToSingleRead()) {
-            long lastEntry = Math.min(startEntry + maxCount - 1, lastAddConfirmed);
-            return readEntriesInternalAsync(startEntry, lastEntry, false);
+        if (notSupportBatchRead()) {
+            long lastEntry = Math.min(firstEntry + maxCount - 1, lastAddConfirmed);
+            return readEntriesInternalAsync(firstEntry, lastEntry, false);
         }
         CompletableFuture<LedgerEntries> future = new CompletableFuture<>();
-        readEntriesInternalAsync(startEntry, maxCount, maxSize, false)
+        batchReadEntriesInternalAsync(firstEntry, maxCount, maxSize, false)
                 .whenComplete((entries, ex) -> {
                     if (ex != null) {
                         if (ex instanceof BKException.BKBookieHandleNotAvailableException) {
                             notSupportBatch = true;
-                            long lastEntry = Math.min(startEntry + maxCount - 1, lastAddConfirmed);
-                            readEntriesInternalAsync(startEntry, lastEntry, false).whenComplete((entries1, ex1) -> {
+                            long lastEntry = Math.min(firstEntry + maxCount - 1, lastAddConfirmed);
+                            readEntriesInternalAsync(firstEntry, lastEntry, false).whenComplete((entries1, ex1) -> {
                                 if (ex1 != null) {
                                     future.completeExceptionally(ex1);
                                 } else {
@@ -834,7 +957,7 @@ public class LedgerHandle implements WriteHandle {
         return future;
     }
 
-    private boolean isFailBackToSingleRead() {
+    private boolean notSupportBatchRead() {
         if (!clientCtx.getConf().batchReadEnabled) {
             return true;
         }
@@ -845,7 +968,7 @@ public class LedgerHandle implements WriteHandle {
         return ledgerMetadata.getEnsembleSize() != ledgerMetadata.getWriteQuorumSize();
     }
 
-    private CompletableFuture<LedgerEntries> readEntriesInternalAsync(long startEntry, int maxCount, long maxSize,
+    private CompletableFuture<LedgerEntries> batchReadEntriesInternalAsync(long firstEntry, int maxCount, long maxSize,
                                                                       boolean isRecoveryRead) {
         int nettyMaxFrameSizeBytes = clientCtx.getConf().nettyMaxFrameSizeBytes;
         if (maxSize > nettyMaxFrameSizeBytes) {
@@ -859,7 +982,7 @@ public class LedgerHandle implements WriteHandle {
             maxSize = nettyMaxFrameSizeBytes;
         }
         BatchedReadOp op = new BatchedReadOp(this, clientCtx,
-                startEntry, maxCount, maxSize, isRecoveryRead);
+                firstEntry, maxCount, maxSize, isRecoveryRead);
         if (!clientCtx.isClientClosed()) {
             // Waiting on the first one.
             // This is not very helpful if there are multiple ensembles or if bookie goes into unresponsive
@@ -874,7 +997,7 @@ public class LedgerHandle implements WriteHandle {
             // current implementation will prevent next batch from starting when bookie is
             // unresponsive thus helpful enough.
             if (clientCtx.getConf().waitForWriteSetMs >= 0) {
-                DistributionSchedule.WriteSet ws = distributionSchedule.getWriteSet(startEntry);
+                DistributionSchedule.WriteSet ws = distributionSchedule.getWriteSet(firstEntry);
                 try {
                     if (!waitForWritable(ws, ws.size() - 1, clientCtx.getConf().waitForWriteSetMs)) {
                         op.allowFailFastOnUnwritableChannel();
@@ -967,10 +1090,10 @@ public class LedgerHandle implements WriteHandle {
         }
     }
 
-    void asyncReadEntriesInternal(long firstEntry, int maxCount, long maxSize, ReadCallback cb,
+    void asyncBatchReadEntriesInternal(long firstEntry, int maxCount, long maxSize, ReadCallback cb,
                                   Object ctx, boolean isRecoveryRead) {
         if (!clientCtx.isClientClosed()) {
-            readEntriesInternalAsync(firstEntry, maxCount, maxSize, isRecoveryRead)
+            batchReadEntriesInternalAsync(firstEntry, maxCount, maxSize, isRecoveryRead)
                     .whenCompleteAsync(new FutureEventListener<LedgerEntries>() {
                         @Override
                         public void onSuccess(LedgerEntries entries) {
