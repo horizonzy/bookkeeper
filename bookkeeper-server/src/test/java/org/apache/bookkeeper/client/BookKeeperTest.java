@@ -609,6 +609,97 @@ public class BookKeeperTest extends BookKeeperClusterTestCase {
             }
         }
     }
+    
+    @Test
+    public void testBatchRead() throws Exception {
+        ClientConfiguration conf = new ClientConfiguration();
+        conf.setMetadataServiceUri(zkUtil.getMetadataServiceUri());
+        int numEntries = 100;
+        byte[] data = "foobar".getBytes();
+        try (BookKeeper bkc = new BookKeeper(conf)) {
+            
+            // basic read/write
+            {
+                long ledgerId;
+                try (LedgerHandle lh = bkc.createLedger(digestType, "testPasswd".getBytes())) {
+                    ledgerId = lh.getId();
+                    for (int i = 0; i < numEntries; i++) {
+                        lh.addEntry(data);
+                    }
+                }
+                try (LedgerHandle lh = bkc.openLedger(ledgerId, digestType, "testPasswd".getBytes())) {
+                    assertEquals(numEntries - 1, lh.readLastConfirmed());
+                    for (Enumeration<LedgerEntry> readEntries = lh.batchReadEntries(0, numEntries, 5 * 1024 * 1024, true);
+                            readEntries.hasMoreElements();) {
+                        LedgerEntry entry = readEntries.nextElement();
+                        assertArrayEquals(data, entry.getEntry());
+                    }
+                }
+            }
+            
+            // basic fencing
+            {
+                long ledgerId;
+                try (LedgerHandle lh2 = bkc.createLedger(digestType, "testPasswd".getBytes())) {
+                    ledgerId = lh2.getId();
+                    lh2.addEntry(data);
+                    try (LedgerHandle lh2Fence = bkc.openLedger(ledgerId, digestType, "testPasswd".getBytes())) {
+                    }
+                    try {
+                        lh2.addEntry(data);
+                        fail("ledger should be fenced");
+                    } catch (BKException.BKLedgerFencedException ex){
+                    }
+                }
+            }
+        }
+    }
+    
+
+    @Test
+    public void testBatchReadWithV2Protocol() throws Exception {
+        ClientConfiguration conf = new ClientConfiguration().setUseV2WireProtocol(true);
+        conf.setMetadataServiceUri(zkUtil.getMetadataServiceUri());
+        int numEntries = 100;
+        byte[] data = "foobar".getBytes();
+        try (BookKeeper bkc = new BookKeeper(conf)) {
+            
+            // basic read/write
+            {
+                long ledgerId;
+                try (LedgerHandle lh = bkc.createLedger(digestType, "testPasswd".getBytes())) {
+                    ledgerId = lh.getId();
+                    for (int i = 0; i < numEntries; i++) {
+                        lh.addEntry(data);
+                    }
+                }
+                try (LedgerHandle lh = bkc.openLedger(ledgerId, digestType, "testPasswd".getBytes())) {
+                    assertEquals(numEntries - 1, lh.readLastConfirmed());
+                    for (Enumeration<LedgerEntry> readEntries = lh.readEntries(0, numEntries - 1);
+                            readEntries.hasMoreElements();) {
+                        LedgerEntry entry = readEntries.nextElement();
+                        assertArrayEquals(data, entry.getEntry());
+                    }
+                }
+            }
+            
+            // basic fencing
+            {
+                long ledgerId;
+                try (LedgerHandle lh2 = bkc.createLedger(digestType, "testPasswd".getBytes())) {
+                    ledgerId = lh2.getId();
+                    lh2.addEntry(data);
+                    try (LedgerHandle lh2Fence = bkc.openLedger(ledgerId, digestType, "testPasswd".getBytes())) {
+                    }
+                    try {
+                        lh2.addEntry(data);
+                        fail("ledger should be fenced");
+                    } catch (BKException.BKLedgerFencedException ex){
+                    }
+                }
+            }
+        }
+    }
 
     @SuppressWarnings("deprecation")
     @Test
