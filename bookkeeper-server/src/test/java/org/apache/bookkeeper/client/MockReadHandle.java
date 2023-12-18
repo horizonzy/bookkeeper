@@ -83,7 +83,8 @@ class MockReadHandle implements ReadHandle {
     }
 
     @Override
-    public CompletableFuture<LedgerEntries> readAsync(long startEntry, int maxCount, long maxSize) {
+    public CompletableFuture<LedgerEntries> batchReadAsync(long startEntry, int maxCount, long maxSize,
+            boolean failbackToSingleRead) {
         return null;
     }
 

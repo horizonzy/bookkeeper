@@ -130,10 +130,10 @@ public class BatchedReadOp extends ReadOpBase implements BatchedReadEntryCallbac
         }
         if (isRecoveryRead) {
             int flags = BookieProtocol.FLAG_HIGH_PRIORITY | BookieProtocol.FLAG_DO_FENCING;
-            clientCtx.getBookieClient().readEntries(to, lh.ledgerId, entry.eId,
+            clientCtx.getBookieClient().batchReadEntries(to, lh.ledgerId, entry.eId,
                     maxCount, maxSize, this, new ReadContext(bookieIndex, to, entry), flags, lh.ledgerKey);
         } else {
-            clientCtx.getBookieClient().readEntries(to, lh.ledgerId, entry.eId, maxCount, maxSize,
+            clientCtx.getBookieClient().batchReadEntries(to, lh.ledgerId, entry.eId, maxCount, maxSize,
                     this, new ReadContext(bookieIndex, to, entry), BookieProtocol.FLAG_NONE);
         }
     }

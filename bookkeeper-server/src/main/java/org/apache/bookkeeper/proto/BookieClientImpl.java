@@ -505,7 +505,7 @@ public class BookieClientImpl implements BookieClient, PerChannelBookieClientFac
     }
 
     @Override
-    public void readEntries(final BookieId address, final long ledgerId, final long startEntryId,
+    public void batchReadEntries(final BookieId address, final long ledgerId, final long startEntryId,
                             final int maxCount, final long maxSize, final BatchedReadEntryCallback cb, final Object ctx,
                             final int flags, final byte[] masterKey, final boolean allowFastFail) {
         final PerChannelBookieClientPool client = lookupClient(address);
