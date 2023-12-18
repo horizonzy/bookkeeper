@@ -109,7 +109,7 @@ public class BenchReadThroughputLatency {
                         long readTo = Math.min(nextLimit, lastConfirmed);
                         entries = lh.readEntries(lastRead + 1, readTo);
                     } else {
-                        entries = lh.readEntries(lastRead, batchEntries, -1);
+                        entries = lh.batchReadEntries(lastRead, batchEntries, -1, true);
                     }
                     while (entries.hasMoreElements()) {
                         LedgerEntry e = entries.nextElement();
