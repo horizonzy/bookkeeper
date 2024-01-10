@@ -119,12 +119,18 @@ public class TestSmoke {
             long lac = readlh.getLastAddConfirmed();
             int i = 0;
             Enumeration<LedgerEntry> entries = readlh.readEntries(0, lac);
+            Enumeration<LedgerEntry> entries2 = readlh.batchReadEntries(0, 500, -1, true);
             while (entries.hasMoreElements()) {
                 LedgerEntry e = entries.nextElement();
                 String readBack = new String(e.getEntry());
                 assertEquals(readBack, "entry-" + i++);
             }
-            assertEquals(i, numExpectedEntries);
+            while (entries2.hasMoreElements()) {
+                LedgerEntry e = entries.nextElement();
+                String readBack = new String(e.getEntry());
+                assertEquals(readBack, "entry-" + i++);
+            }
+            assertEquals(i, 2 * numExpectedEntries);
         }
     }
 

@@ -189,6 +189,12 @@ public class MockBookieClient implements BookieClient {
     }
 
     @Override
+    public void batchReadEntries(BookieId address, long ledgerId, long startEntryId, int maxCount, long maxSize,
+            BookkeeperInternalCallbacks.BatchedReadEntryCallback cb, Object ctx, int flags, byte[] masterKey,
+            boolean allowFastFail) {
+    }
+
+    @Override
     public void readLac(BookieId addr, long ledgerId, ReadLacCallback cb, Object ctx) {
         executor.executeOrdered(ledgerId,
                 () -> cb.readLacComplete(BKException.Code.IllegalOpException, ledgerId, null, null, ctx));
