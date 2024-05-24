@@ -153,6 +153,7 @@ public class SimpleTestCommandTest extends ClientCommandTestBase {
         verify(wh, times(1)).close();
 
         // verify read entry 0-9
+        verify(rh, times(1)).readUnconfirmed(0, 9);
         verify(rh, times(1)).read(0, 9);
     }
 
