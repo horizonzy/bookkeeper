@@ -256,8 +256,8 @@ class PendingAddOp implements WriteCallback {
         // because of delayed write errors
         lh.maybeHandleDelayedWriteBookieFailure();
 
-        // Iterate over set and trigger the sendWriteRequests
-        for (int i = 0; i < lh.distributionSchedule.getWriteQuorumSize(); i++) {
+        // An inline client-close response can complete and recycle this operation.
+        for (int i = 0; toSend != null && !callbackTriggered && i < lh.distributionSchedule.getWriteQuorumSize(); i++) {
             sendWriteRequest(ensemble, lh.distributionSchedule.getWriteSetBookieIndex(entryId, i));
         }
     }

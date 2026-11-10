@@ -224,6 +224,42 @@ public class PendingAddOpTest {
     }
 
     @Test(timeout = 30000)
+    public void testInitialSendStopsAfterInlineClientClose() throws Exception {
+        MockClientContext client = MockClientContext.create();
+        client.setBookieClient(mock(BookieClient.class));
+        AtomicInteger sends = new AtomicInteger();
+        doAnswer(call -> {
+            sends.incrementAndGet();
+            WriteCallback cb = call.getArgument(5);
+            cb.writeComplete(Code.ClientClosedException, call.getArgument(1), call.getArgument(3),
+                    call.getArgument(0), call.getArgument(6));
+            return null;
+        }).when(client.getBookieClient()).addEntry(any(), anyLong(), any(), anyLong(), any(), any(), any(),
+                anyInt(), anyBoolean(), any(), any());
+
+        try {
+            Versioned<LedgerMetadata> metadata = ClientUtil.setupLedger(client, 14L,
+                    LedgerMetadataBuilder.create().withEnsembleSize(2).withWriteQuorumSize(2).withAckQuorumSize(2)
+                            .newEnsembleEntry(0L, Arrays.asList(BookieId.parse("a:3181"), BookieId.parse("b:3181"))));
+            LedgerHandle handle = new LedgerHandle(client, 14L, metadata, BookKeeper.DigestType.CRC32C,
+                    ClientUtil.PASSWD, WriteFlag.NONE);
+            AtomicInteger callbacks = new AtomicInteger();
+            CompletableFuture<Integer> result = new CompletableFuture<>();
+            handle.asyncAddEntry(new byte[] {1}, (rc, lh, entryId, ctx) -> {
+                callbacks.incrementAndGet();
+                result.complete(rc);
+            }, null);
+
+            assertEquals(Integer.valueOf(Code.ClientClosedException), result.get(10, TimeUnit.SECONDS));
+            assertEquals(1, callbacks.get());
+            assertEquals(1, sends.get());
+        } finally {
+            client.getMainWorkerPool().shutdown();
+            client.getScheduler().shutdown();
+        }
+    }
+
+    @Test(timeout = 30000)
     public void testAckRemovalRechecksFaultDomains() throws Exception {
         checkResendCompletion(true);
     }
